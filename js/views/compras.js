@@ -3,7 +3,7 @@ import * as S from '../store.js';
 import { h, btn, iconBtn, field, numInput, textInput, select, checkbox, toggle, modal, confirmDialog, toast, empty, icon, fmtDate } from '../ui.js';
 import { unitOf, collapse, fmtIn, isZeroVec, displayUnit, trimZeros } from '../units.js';
 import {
-  activePlan, rangeNeeds, purchaseVec, pantryAt, setPantry, buyDim, packSize,
+  activePlan, rangeNeeds, purchaseVec, buyDim, packSize,
   isoDate, parseIsoDate, addDays, fmtMoney,
 } from '../calc.js';
 import { refresh, go } from '../nav.js';
@@ -26,7 +26,6 @@ function newGen() {
     planId: plan ? plan.id : '',
     start: isoDate(new Date()),
     days: 7,
-    useAlacena: true,
     rows: {},
     open: new Set(),
   };
@@ -38,7 +37,7 @@ function pctTxt(n) {
 
 // ---------- Cálculo de la lista ----------
 
-function computeRows(g) {
+export function computeRows(g) {
   const plan = S.get('plans', g.planId);
   if (!plan) return [];
   const start = parseIsoDate(g.start);
@@ -54,15 +53,14 @@ function computeRows(g) {
     const dim = buyDim(ing);
     const vec = purchaseVec(slot, mc, mk, mg);
     const { val: need, rest } = collapse(vec, ing, dim);
-    const autoHave = pantryAt(ingId, start);
-    const have = g.useAlacena ? (ov.have ?? autoHave) : 0;
+    const have = Math.max(0, ov.have ?? 0);
     let buy = Math.max(0, need - have);
     if (dim === 'pz') buy = Math.ceil(buy - 1e-9);
     const ps = packSize(ing);
     const packs = ps > 0 && buy > 0 ? Math.ceil(buy / ps - 1e-9) : 0;
     const covered = buy <= 1e-9 && isZeroVec(rest);
     out.push({
-      ing, slot, mc, mk, mg, dim, need, rest, have, autoHave, buy, ps, packs, covered,
+      ing, slot, mc, mk, mg, dim, need, rest, have, buy, ps, packs, covered,
       include: ov.include ?? !covered,
       usedIn: [...slot.usedIn],
       hasCooked: !isZeroVec(slot.cooked),
@@ -82,7 +80,7 @@ function restText(rest) {
   return parts.join(' + ');
 }
 
-function freeze(g, rows) {
+export function freeze(g, rows) {
   const plan = S.get('plans', g.planId);
   const aisles = S.sortedAisles();
   const items = rows.filter(r => r.include).map(r => {
@@ -124,7 +122,6 @@ function freeze(g, rows) {
     currency: S.settings().currency || 'MXN',
     status: 'open',
     closedAt: null,
-    pantryApplied: false,
   };
 }
 
@@ -172,17 +169,18 @@ function generator() {
           h('strong', null, r.ing.name),
           h('span', { class: 'muted small' }, r.usedIn.join(', '))),
         h('div', { class: 'gen-buy' },
-          r.covered ? h('span', { class: 'badge badge-ok' }, 'Ya tienes') : h('strong', null, r.packs ? `${r.packs} × ${r.ing.pack.name || 'paquete'}` : fmtIn(r.buy, r.ing.buyUnit, { ceil: true })),
+          r.covered ? h('span', { class: 'badge badge-ok' }, 'Ya lo tienes') : h('strong', null, r.packs ? `${r.packs} × ${r.ing.pack.name || 'paquete'}` : fmtIn(r.buy, r.ing.buyUnit, { ceil: true })),
           r.packs ? h('span', { class: 'muted small' }, fmtIn(r.buy, r.ing.buyUnit)) : null,
           r.rest && !isZeroVec(r.rest) ? h('span', { class: 'warn-text small', title: 'Define gramos por pieza en el ingrediente para convertir' }, '+ ' + restText(r.rest)) : null)),
       h('div', { class: 'gen-mid' },
         h('span', { class: 'muted small' }, 'Necesitas ', h('b', null, fmtIn(r.need, r.ing.buyUnit))),
-        gen.useAlacena ? h('label', { class: 'have' },
+        h('label', { class: 'have' },
           h('span', { class: 'muted small' }, 'Tienes'),
-          numInput(r.have / u.f, v => setRow(r.ing.id, { have: v == null ? undefined : v * u.f }), { k: 'have-' + r.ing.id, label: 'Tienes' }),
+          numInput(r.have ? r.have / u.f : null, v => setRow(r.ing.id, { have: v == null ? 0 : Math.max(0, v * u.f), include: undefined }), { k: 'have-' + r.ing.id, label: 'Tienes', placeholder: '0' }),
           h('span', { class: 'small' }, u.label),
-          gen.rows[r.ing.id] && gen.rows[r.ing.id].have != null
-            ? iconBtn('sync', 'Usar lo de la alacena', () => setRow(r.ing.id, { have: undefined }), { cls: 'icon-btn-sm' }) : null) : null),
+          r.have > 0
+            ? iconBtn('x', 'No tengo nada', () => setRow(r.ing.id, { have: 0, include: undefined }), { cls: 'icon-btn-sm' })
+            : btn('Lo tengo', () => setRow(r.ing.id, { have: r.need, include: undefined }), { small: true, kind: 'ghost', cls: 'btn-xs' }))),
       details));
   });
 
@@ -192,7 +190,7 @@ function generator() {
       field('Dieta', select(plans.map(p => ({ value: p.id, label: p.name })), gen.planId, v => { gen.planId = v; refresh(); })),
       field('Primer día', h('input', { class: 'input', type: 'date', value: gen.start, 'data-k': 'g-start', onchange: e => { if (e.target.value) { gen.start = e.target.value; refresh(); } } })),
       field('Días', numInput(gen.days, v => { gen.days = Math.min(Math.max(Math.round(v || 7), 1), 90); refresh(); }, { k: 'g-days' }), `Del ${fmtDate(start, { day: 'numeric', month: 'short' })} al ${fmtDate(end, { day: 'numeric', month: 'short' })}`),
-      h('div', { class: 'field' }, toggle(gen.useAlacena, v => { gen.useAlacena = v; refresh(); }, 'Restar lo que hay en la alacena', 'Solo compras lo que falta.'))),
+      h('p', { class: 'muted small span-2' }, 'Escribe cuánto tienes de cada ingrediente (o toca "Lo tengo") y la lista solo pedirá lo que falta. Desmarca lo que no quieras comprar.')),
     !rows.length
       ? empty('No hay nada que comprar', 'La dieta no tiene platillos con ingredientes en esos días.')
       : h('section', { class: 'card' },
@@ -238,7 +236,7 @@ function editItem(l, it) {
     body: h('div', { class: 'stack' },
       it.packSize ? field(`Presentaciones (${it.packName})`, numInput(d.packs, v => { d.packs = Math.max(0, Math.round(v || 0)); })) : null,
       field(`Cantidad a comprar (${u.label})`, numInput(d.buy, v => { d.buy = v || 0; })),
-      field(`Lo que compraste realmente (${u.label})`, numInput(d.bought, v => { d.bought = v; }, { placeholder: 'Igual a la lista' }), 'Si compraste de más o de menos. Es lo que se suma a la alacena.'),
+      field(`Lo que compraste realmente (${u.label})`, numInput(d.bought, v => { d.bought = v; }, { placeholder: 'Igual a la lista' }), 'Opcional: si compraste de más o de menos, para tu registro.'),
       field('Nota', textInput(d.note, v => { d.note = v; }, { placeholder: 'Ej. marca, precio…' })),
       h('p', { class: 'muted small' },
         `Necesitabas ${fmtIn(it.need, it.unit)} · tenías ${fmtIn(it.have, it.unit)}`,
@@ -303,37 +301,28 @@ function addCatalogItem(l) {
 function closePurchase(l) {
   let total = l.total;
   let currency = l.currency || 'MXN';
-  let addPantry = !l.pantryApplied;
-  const checked = l.items.filter(it => it.checked);
+  const unchecked = l.items.filter(it => !it.checked).length + (l.extras || []).filter(x => !x.checked).length;
+  let markAll = true;
   modal({
     title: 'Cerrar compra',
     body: h('div', { class: 'stack' },
       h('div', { class: 'row-2' },
         field('Total del ticket', numInput(total, v => { total = v; }, { placeholder: '0.00' })),
         field('Moneda', select(CURRENCIES, currency, v => { currency = v; }))),
-      l.pantryApplied
-        ? h('p', { class: 'muted small' }, 'Lo comprado ya se sumó a la alacena.')
-        : toggle(addPantry, v => { addPantry = v; }, `Sumar lo comprado a la alacena (${checked.length} artículos marcados)`, 'Se usa la cantidad que compraste realmente, o la de la lista.'),
-      checked.length < l.items.length ? h('p', { class: 'warn-text small' }, `${l.items.length - checked.length} artículo(s) sin marcar no se sumarán.`) : null),
+      unchecked ? toggle(markAll, v => { markAll = v; }, `Compré todo (${unchecked} sin marcar)`, 'Si lo apagas, lo no marcado queda como no comprado.') : null),
     actions: [
       { label: 'Cancelar', kind: 'ghost' },
       {
         label: 'Cerrar compra', kind: 'primary', icon: 'check', onClick: () => {
-          const fresh = S.get('lists', l.id) || l;
-          let applied = fresh.pantryApplied;
-          if (addPantry && !applied) {
-            fresh.items.filter(it => it.checked).forEach(it => {
-              const ing = S.get('ingredients', it.ingId);
-              if (!ing) return;
-              const qty = it.bought != null ? it.bought : it.buy;
-              const v = { g: 0, ml: 0, pz: 0 };
-              v[it.dim] = qty;
-              const add = collapse(v, { gPorPieza: ing.gPorPieza, gPorMl: ing.gPorMl }, buyDim(ing)).val;
-              setPantry(ing.id, pantryAt(ing.id) + add);
-            });
-            applied = true;
+          let fresh = S.get('lists', l.id) || l;
+          if (markAll && unchecked) {
+            fresh = {
+              ...fresh,
+              items: fresh.items.map(it => ({ ...it, checked: true })),
+              extras: (fresh.extras || []).map(x => ({ ...x, checked: true })),
+            };
           }
-          updateList(fresh, { total, currency, status: 'closed', closedAt: Date.now(), pantryApplied: applied });
+          updateList(fresh, { total, currency, status: 'closed', closedAt: Date.now() });
           toast('Compra cerrada', 'ok');
         },
       },
@@ -466,7 +455,7 @@ function detail(id) {
         field('Total', numInput(l.total, v => updateList(S.get('lists', l.id), { total: v }), { k: 'l-total', placeholder: '0.00' })),
         field('Moneda', select(CURRENCIES, l.currency || 'MXN', v => updateList(S.get('lists', l.id), { currency: v }), { k: 'l-cur' }))),
       l.total ? h('p', { class: 'ticket-total' }, fmtMoney(l.total, l.currency || 'MXN')) : null,
-      closed ? h('p', { class: 'muted small' }, `Cerrada el ${fmtDate(l.closedAt)}${l.pantryApplied ? ' · sumada a la alacena' : ''}`) : null),
+      closed ? h('p', { class: 'muted small' }, `Cerrada el ${fmtDate(l.closedAt)}`) : null),
     h('div', { class: 'btn-row end no-print' },
       closed
         ? btn('Reabrir', () => updateList(l, { status: 'open' }), { kind: 'ghost' })

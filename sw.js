@@ -1,6 +1,6 @@
 // Modo sin conexión: guarda los archivos de la app y los sirve si no hay internet.
 // Primero intenta la red (para recibir actualizaciones) y si falla usa la copia guardada.
-const CACHE = 'mi-dieta-v1';
+const CACHE = 'mi-dieta-v2';
 const FILES = [
   './',
   './index.html',
@@ -18,7 +18,8 @@ const FILES = [
   './js/views/platillos.js',
   './js/views/ingredientes.js',
   './js/views/compras.js',
-  './js/views/alacena.js',
+  './js/views/progreso.js',
+  './js/tracking.js',
   './js/views/gastos.js',
   './js/views/ajustes.js',
   './js/views/mas.js',

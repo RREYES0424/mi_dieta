@@ -1,6 +1,6 @@
 // Gastos: totales de tickets por mes y semana, en MXN, USD o todo convertido a MXN.
 import * as S from '../store.js';
-import { h, select, numInput, field, empty, fmtDate } from '../ui.js';
+import { h, select, numInput, field, empty, fmtDate, chartWidth, niceStep } from '../ui.js';
 import { fmtMoney, startOfDay, addDays } from '../calc.js';
 import { refresh } from '../nav.js';
 
@@ -18,25 +18,19 @@ function amountIn(p, view, rate) {
   return p.currency === view ? p.total : 0;
 }
 
-function niceMax(v) {
-  if (v <= 0) return 1;
-  const p = Math.pow(10, Math.floor(Math.log10(v)));
-  const n = v / p;
-  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
-  return step * p;
-}
 
 function shortMoney(v) {
-  if (v >= 1000) return '$' + (Math.round(v / 100) / 10).toString() + 'k';
+  if (v >= 1000) return '$' + (Math.round(v / 10) / 100).toString() + 'k';
   return '$' + Math.round(v);
 }
 
 function barChart(data, cur) {
-  const W = 720, H = 260, padL = 48, padR = 8, padT = 16, padB = 28;
-  const max = niceMax(Math.max(...data.map(d => d.value), 0));
+  const W = chartWidth(), H = W < 500 ? 220 : 260, padL = 48, padR = 8, padT = 16, padB = 28;
+  const step = niceStep(Math.max(...data.map(d => d.value), 0) / 4);
+  const max = step * 4;
   const iw = W - padL - padR, ih = H - padT - padB;
   const slot = iw / data.length;
-  const bw = Math.max(Math.min(slot - 8, 36), 6);
+  const bw = Math.max(Math.min(slot - 6, 36), 6);
   const y = v => padT + ih - (v / max) * ih;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => t * max);
 
@@ -66,9 +60,11 @@ function barChart(data, cur) {
         class: 'bar' + (d.current ? ' bar-current' : ''),
       }));
     }
-    const lx = mk('text', { x: cx, y: H - 8, class: 'axis', 'text-anchor': 'middle' });
-    lx.textContent = d.label;
-    svg.appendChild(lx);
+    if (slot >= 30 || i % 2 === (data.length - 1) % 2) {
+      const lx = mk('text', { x: cx, y: H - 8, class: 'axis', 'text-anchor': 'middle' });
+      lx.textContent = d.label;
+      svg.appendChild(lx);
+    }
     // Zona de interacción más grande que la barra.
     const hit = mk('rect', { x: padL + slot * i, y: padT, width: slot, height: ih, class: 'hit', tabindex: 0 });
     const show = () => {

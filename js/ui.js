@@ -43,6 +43,7 @@ const P = {
   leaf: '<path d="M5 19c0-8 5-14 15-14 0 10-6 15-14 15"/><path d="M5 19l8-8"/>',
   cart: '<path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
   pantry: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 6h4M10 12h4M10 18h4"/>',
+  chart: '<path d="M4 20V4M4 20h16"/><path d="M8 16l4-5 3 3 5-7"/>',
   money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
@@ -286,4 +287,19 @@ export function fmtTime(t) {
   const ap = hh >= 12 ? 'p. m.' : 'a. m.';
   const h12 = hh % 12 === 0 ? 12 : hh % 12;
   return `${h12}:${String(mm).padStart(2, '0')} ${ap}`;
+}
+
+// Ancho del dibujo según la pantalla, para que el texto de los ejes se lea en celular.
+export function chartWidth() {
+  const v = document.getElementById('view');
+  const w = v ? v.clientWidth - 64 : 720;
+  return Math.round(Math.min(Math.max(w, 280), 760));
+}
+
+// Paso "bonito" para ejes (1, 2, 2.5, 5 × 10^n).
+export function niceStep(raw) {
+  if (!(raw > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
 }

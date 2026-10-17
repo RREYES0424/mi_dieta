@@ -160,7 +160,6 @@ export async function deleteIngredient(ing) {
   if (!(await confirmDialog(msg, { ok: 'Eliminar', danger: true }))) return false;
   used.forEach(r => S.put('recipes', { ...r, items: r.items.filter(it => it.ingId !== ing.id) }));
   S.remove('ingredients', ing.id);
-  S.remove('pantry', ing.id);
   toast('Ingrediente eliminado');
   return true;
 }

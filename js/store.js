@@ -6,7 +6,7 @@
 const LS_DATA = 'midieta.data.v1';
 const LS_PREFS = 'midieta.prefs.v1';
 
-export const COLLECTIONS = ['aisles', 'ingredients', 'recipes', 'plans', 'lists', 'pantry'];
+export const COLLECTIONS = ['aisles', 'ingredients', 'recipes', 'plans', 'lists', 'logs', 'body'];
 
 const DEFAULT_AISLES = [
   'Frutas y verduras', 'Carnes', 'Pescados y mariscos', 'Salchichonería', 'Lácteos y huevo',
@@ -31,7 +31,7 @@ function seed() {
     activePlanId: 'plan-principal',
     currency: 'MXN',
     exchangeRate: 0,
-    autoConsumo: true,
+    weightUnit: 'kg',
     updatedAt: 1,
   };
   return d;
@@ -175,11 +175,18 @@ export function merge(a, b) {
       const x = A[c][id], y = B[c][id];
       if (!x) out[c][id] = y;
       else if (!y) out[c][id] = x;
-      else out[c][id] = (y.updatedAt || 0) > (x.updatedAt || 0) ? y : x;
+      else out[c][id] = newer(x, y);
     });
   });
-  out.settings = (B.settings.updatedAt || 0) > (A.settings.updatedAt || 0) ? B.settings : A.settings;
+  out.settings = newer(A.settings, B.settings);
   return out;
+}
+
+// Gana el más reciente; si empatan, una regla fija para que todos los dispositivos coincidan.
+function newer(x, y) {
+  const tx = x.updatedAt || 0, ty = y.updatedAt || 0;
+  if (tx !== ty) return ty > tx ? y : x;
+  return JSON.stringify(y) > JSON.stringify(x) ? y : x;
 }
 
 // Huella para saber si dos copias son iguales sin comparar todo el contenido.

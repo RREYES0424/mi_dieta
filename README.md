@@ -13,11 +13,13 @@ Funciona en PC, tablet y celular, se puede instalar como app y funciona sin inte
 - **Ingredientes**: pasillo, unidad de compra (g, kg, lb, oz, ml, l, piezas…), merma al limpiar, merma de cocción,
   % de compra extra, gramos por pieza, densidad (para lo que pesas pero compras por litro),
   presentación de compra (cartón de 946 ml, bolsa de 1 kg…) y macros opcionales.
-- **Lista de compras**: se genera a partir de la dieta para los días que elijas. Puedes ajustar mermas y extra por
-  ingrediente y restar lo que tienes en la alacena. La lista se guarda con fecha y tiene casillas para ir marcando.
-  También puedes compartirla por WhatsApp o imprimirla, y capturar el total del ticket en MXN o USD.
-- **Alacena**: lo que tienes en casa. Al cerrar una compra se suma lo comprado y, si quieres, se descuenta sola
-  cada día según tu dieta activa. Así, si compraste de más, la siguiente lista lo toma en cuenta.
+- **Lista de compras**: se genera a partir de la dieta para los días que elijas. Al generarla escribes cuánto tienes
+  de cada ingrediente (o tocas "Lo tengo") y solo pide lo que falta; también puedes ajustar mermas y extra por
+  ingrediente. La lista se guarda con fecha y tiene casillas para ir marcando. Puedes compartirla por WhatsApp
+  o imprimirla, y al cerrarla capturas el total del ticket en MXN o USD ("Compré todo" marca lo que falte).
+- **Hoy**: el menú del día con horarios; marca "Lo comí" en cada comida y escribe una nota del día.
+- **Progreso**: peso, cintura y % de grasa con gráfica; cumplimiento de la dieta (mapa de las últimas 12 semanas,
+  porcentaje y racha); promedio de calorías y macros que comiste contra la meta; historial de registros y compras.
 - **Gastos**: total por mes, últimos 30 días, promedio semanal y una gráfica de los últimos 12 meses.
 - **Sincronización** con un gist secreto de tu cuenta de GitHub para tener los mismos datos en todos tus dispositivos.
 - Modo oscuro, respaldo en archivo y funcionamiento sin conexión.
@@ -27,7 +29,7 @@ Funciona en PC, tablet y celular, se puede instalar como app y funciona sin inte
 ```
 crudo     = lo que se pesa crudo + (lo que se pesa cocido ÷ (1 − merma de cocción))
 comprar   = crudo ÷ (1 − merma al limpiar) × (1 + extra)
-a comprar = comprar − lo que hay en la alacena
+a comprar = comprar − lo que ya tienes
 ```
 
 Las piezas y las presentaciones siempre se redondean hacia arriba.
@@ -90,7 +92,8 @@ css/styles.css          Estilos (responsivo, claro y oscuro)
 js/app.js               Arranque y navegación
 js/store.js             Datos locales y combinación para sincronizar
 js/sync.js              Sincronización con el gist
-js/calc.js              Cálculos: menú, necesidades, mermas, alacena, macros
+js/calc.js              Cálculos: menú, necesidades, mermas, macros
+js/tracking.js          Registro diario (comidas hechas) y peso
 js/units.js             Unidades y conversiones
 js/ui.js                Componentes de interfaz
 js/views/*.js           Pantallas

@@ -2,7 +2,7 @@
 import { h, icon } from '../ui.js';
 
 const ITEMS = [
-  { path: 'alacena', label: 'Alacena', icon: 'pantry', text: 'Lo que tienes en casa' },
+  { path: 'progreso', label: 'Progreso', icon: 'chart', text: 'Peso, cumplimiento e historial' },
   { path: 'ingredientes', label: 'Ingredientes', icon: 'leaf', text: 'Catálogo, mermas, unidades y pasillos' },
   { path: 'gastos', label: 'Gastos', icon: 'money', text: 'Cuánto gastas por semana y por mes' },
   { path: 'ajustes', label: 'Ajustes', icon: 'gear', text: 'Sincronización, tema, moneda y respaldo' },

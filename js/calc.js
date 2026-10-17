@@ -1,4 +1,4 @@
-// Cálculos de dieta: menú por día, necesidades por periodo, mermas, alacena y macros.
+// Cálculos de dieta: menú por día, necesidades por periodo, mermas y macros.
 import * as S from './store.js';
 import { toVec, addVec, scaleVec, zero, collapse, unitOf } from './units.js';
 
@@ -91,7 +91,7 @@ function pct(n) {
   return Math.min(Math.max(x, 0), 95) / 100;
 }
 
-// Cantidad a comprar (antes de restar alacena):
+// Cantidad a comprar (antes de restar lo que ya tienes):
 //   lo cocido se convierte a crudo con la merma de cocción, luego se aplica la merma
 //   de limpieza (cáscara, hueso…) y al final el margen extra.
 export function purchaseVec(slot, mermaCrudo, mermaCocido, margen) {
@@ -111,45 +111,6 @@ export function packSize(ing) {
   if (!p || !(Number(p.size) > 0)) return 0;
   const { val, rest } = collapse(toVec(p.size, p.unit), ing, buyDim(ing));
   return rest.g || rest.ml || rest.pz ? 0 : val;
-}
-
-// ---------- Alacena ----------
-
-let memo = { key: '', map: {} };
-
-function consumptionSince(fromDate, toDate) {
-  const plan = activePlan();
-  const days = Math.min(Math.max(daysBetween(fromDate, toDate), 0), 400);
-  const key = [S.getVersion(), plan && plan.id, isoDate(fromDate), days].join('|');
-  if (memo.key === key) return memo.map;
-  memo = { key, map: rangeNeeds(plan, fromDate, days) };
-  return memo.map;
-}
-
-// Lo que hay en la alacena (en la dimensión de compra), restando el consumo estimado
-// desde el último ajuste si el consumo automático está activo.
-export function pantryAt(ingId, atDate = new Date()) {
-  const p = S.get('pantry', ingId);
-  const ing = S.get('ingredients', ingId);
-  if (!p || !ing) return 0;
-  const dim = buyDim(ing);
-  let have = collapse(p.vec || zero(), ing, dim).val;
-  if (S.settings().autoConsumo !== false && p.asOf) {
-    const slot = consumptionSince(new Date(p.asOf), atDate)[ingId];
-    if (slot) {
-      const used = purchaseVec(slot, ing.mermaCrudo, ing.mermaCocido, 0);
-      have -= collapse(used, ing, dim).val;
-    }
-  }
-  return Math.max(0, have);
-}
-
-export function setPantry(ingId, baseVal) {
-  const ing = S.get('ingredients', ingId);
-  if (!ing) return;
-  const v = zero();
-  v[buyDim(ing)] = Math.max(0, baseVal);
-  S.put('pantry', { id: ingId, vec: v, asOf: Date.now() });
 }
 
 // ---------- Macros ----------

@@ -1,7 +1,7 @@
 // Ajustes: sincronización con gist, apariencia, moneda, respaldo e instalación.
 import * as S from '../store.js';
 import * as Sync from '../sync.js';
-import { h, btn, field, select, segmented, toggle, numInput, confirmDialog, toast, icon, fmtDateTime } from '../ui.js';
+import { h, btn, field, select, segmented, numInput, confirmDialog, toast, icon, fmtDateTime } from '../ui.js';
 import { refresh } from '../nav.js';
 
 let installEvent = null;
@@ -125,10 +125,9 @@ export function render() {
         refresh();
       })),
     h('section', { class: 'card form-grid' },
-      h('h2', { class: 'span-2' }, 'Compras y alacena'),
+      h('h2', { class: 'span-2' }, 'Compras'),
       field('Moneda predeterminada', select([{ value: 'MXN', label: 'MXN (peso mexicano)' }, { value: 'USD', label: 'USD (dólar)' }], st.currency || 'MXN', v => S.setSettings({ currency: v }))),
-      field('Tipo de cambio (MXN por 1 USD)', numInput(st.exchangeRate || null, v => S.setSettings({ exchangeRate: v || 0 }), { k: 'set-rate', placeholder: 'Ej. 18.50' }), 'Para ver todos tus gastos juntos en pesos.'),
-      h('div', { class: 'span-2' }, toggle(st.autoConsumo !== false, v => S.setSettings({ autoConsumo: v }), 'Descontar consumo de la alacena automáticamente', 'Resta cada día lo que marca tu dieta activa.'))),
+      field('Tipo de cambio (MXN por 1 USD)', numInput(st.exchangeRate || null, v => S.setSettings({ exchangeRate: v || 0 }), { k: 'set-rate', placeholder: 'Ej. 18.50' }), 'Para ver todos tus gastos juntos en pesos.')),
     !standalone ? h('section', { class: 'card' },
       h('h2', null, 'Instalar en tu dispositivo'),
       installEvent

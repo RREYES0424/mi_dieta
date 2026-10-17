@@ -8,7 +8,7 @@ import * as Dieta from './views/dieta.js';
 import * as Platillos from './views/platillos.js';
 import * as Ingredientes from './views/ingredientes.js';
 import * as Compras from './views/compras.js';
-import * as Alacena from './views/alacena.js';
+import * as Progreso from './views/progreso.js';
 import * as Gastos from './views/gastos.js';
 import * as Ajustes from './views/ajustes.js';
 import * as Mas from './views/mas.js';
@@ -18,7 +18,7 @@ const NAV = [
   { path: 'dieta', label: 'Dieta', icon: 'plan', mobile: true },
   { path: 'platillos', label: 'Platillos', icon: 'dish', mobile: true },
   { path: 'compras', label: 'Compras', icon: 'cart', mobile: true },
-  { path: 'alacena', label: 'Alacena', icon: 'pantry' },
+  { path: 'progreso', label: 'Progreso', icon: 'chart' },
   { path: 'ingredientes', label: 'Ingredientes', icon: 'leaf' },
   { path: 'gastos', label: 'Gastos', icon: 'money' },
   { path: 'ajustes', label: 'Ajustes', icon: 'gear' },
@@ -26,7 +26,7 @@ const NAV = [
 
 const ROUTES = {
   hoy: Hoy, dieta: Dieta, platillos: Platillos, ingredientes: Ingredientes,
-  compras: Compras, alacena: Alacena, gastos: Gastos, ajustes: Ajustes, mas: Mas,
+  compras: Compras, progreso: Progreso, gastos: Gastos, ajustes: Ajustes, mas: Mas,
 };
 
 function parseHash() {

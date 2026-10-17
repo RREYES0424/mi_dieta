@@ -227,7 +227,7 @@ export function render(params) {
   const activeId = S.settings().activePlanId;
   const el = h('div', { class: 'page' },
     h('div', { class: 'toolbar' },
-      h('p', { class: 'muted grow' }, 'Tus dietas guardadas. La dieta activa es la que se usa en "Hoy", en la alacena y para la lista de compras.'),
+      h('p', { class: 'muted grow' }, 'Tus dietas guardadas. La dieta activa es la que se usa en "Hoy" y para la lista de compras.'),
       btn('Nueva dieta', createPlan, { kind: 'primary', icon: 'plus' })),
     !plans.length ? empty('No tienes dietas', null, btn('Crear dieta', createPlan, { kind: 'primary', icon: 'plus' }))
       : h('div', { class: 'cards' }, plans.map(p => {
