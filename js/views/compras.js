@@ -108,6 +108,15 @@ export function freeze(g, rows) {
       note: '',
     };
   });
+  // Foto de lo que tenías ese día (no se usa para la siguiente lista, solo para consultar).
+  const inventory = rows.filter(r => r.have > 1e-9 || !r.include).map(r => ({
+    ingId: r.ing.id,
+    name: r.ing.name,
+    unit: r.ing.buyUnit || 'g',
+    need: r.need,
+    have: r.have,
+    status: r.covered && r.have > 1e-9 ? 'completo' : r.include ? 'parcial' : 'fuera',
+  }));
   const start = parseIsoDate(g.start);
   return {
     name: 'Lista ' + fmtDate(start, { day: 'numeric', month: 'short' }),
@@ -117,6 +126,7 @@ export function freeze(g, rows) {
     start: g.start,
     days: g.days,
     items,
+    inventory,
     extras: [],
     total: null,
     currency: S.settings().currency || 'MXN',
@@ -449,6 +459,7 @@ function detail(id) {
         }, { cls: 'no-print' })))),
       h('div', { class: 'inline no-print' }, extraInp, btn('Agregar', addExtra, { icon: 'plus', kind: 'ghost' })),
       h('div', { class: 'btn-row no-print' }, btn('Agregar ingrediente del catálogo', () => addCatalogItem(l), { kind: 'ghost', small: true, icon: 'leaf' }))),
+    inventorySection(l, pref),
     h('section', { class: 'card ticket' },
       h('h2', null, 'Ticket'),
       h('div', { class: 'row-2' },
@@ -467,6 +478,35 @@ function detail(id) {
       }, { kind: 'danger', icon: 'trash' })),
   );
   return { title: l.name, el };
+}
+
+// Lo que tenías al generar la lista. Las listas viejas solo guardaban lo de los artículos.
+function listInventory(l) {
+  if (Array.isArray(l.inventory)) return l.inventory;
+  return l.items.filter(it => it.have > 1e-9).map(it => ({ ingId: it.ingId, name: it.name, unit: it.unit, need: it.need, have: it.have, status: 'parcial' }));
+}
+
+const INV_STATUS = {
+  completo: { label: 'Lo tenías completo', cls: 'badge-ok' },
+  parcial: { label: 'Compraste el resto', cls: '' },
+  fuera: { label: 'No lo compraste', cls: '' },
+};
+
+function inventorySection(l, pref) {
+  const inv = listInventory(l).slice().sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  if (!inv.length) return null;
+  return h('section', { class: 'card inventory' },
+    h('details', { class: 'help' },
+      h('summary', null, `Lo que tenías al hacer la lista (${inv.length})`),
+      h('ul', { class: 'rows' }, inv.map(x => {
+        const st = INV_STATUS[x.status] || INV_STATUS.parcial;
+        const u = displayUnit(x.unit, pref, x.need);
+        return h('li', { class: 'row' },
+          h('div', { class: 'row-main' },
+            h('div', { class: 'row-title' }, x.name),
+            h('div', { class: 'row-sub' }, x.have > 1e-9 ? `Tenías ${fmtIn(x.have, u)} · necesitabas ${fmtIn(x.need, u)}` : `Necesitabas ${fmtIn(x.need, u)}`)),
+          h('span', { class: 'badge ' + st.cls }, st.label));
+      }))));
 }
 
 // ---------- Historial ----------
@@ -490,7 +530,8 @@ function history() {
           h('div', { class: 'progress small-progress' },
             h('div', { class: 'progress-bar', style: { width: l.items.length ? (done / l.items.length * 100) + '%' : '0%' } }),
             h('span', { class: 'progress-text' }, `${done}/${l.items.length}`)),
-          l.total ? h('p', { class: 'ticket-total small-total' }, fmtMoney(l.total, l.currency || 'MXN')) : null);
+          l.total ? h('p', { class: 'ticket-total small-total' }, fmtMoney(l.total, l.currency || 'MXN')) : null,
+          listInventory(l).length ? h('p', { class: 'muted small' }, `Tenías ${listInventory(l).length} ingrediente${listInventory(l).length === 1 ? '' : 's'}`) : null);
       })),
   );
   return { title: 'Compras', el };

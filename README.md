@@ -15,7 +15,7 @@ Funciona en PC, tablet y celular, se puede instalar como app y funciona sin inte
   presentación de compra (cartón de 946 ml, bolsa de 1 kg…) y macros opcionales.
 - **Lista de compras**: se genera a partir de la dieta para los días que elijas. Al generarla escribes cuánto tienes
   de cada ingrediente (o tocas "Lo tengo") y solo pide lo que falta; también puedes ajustar mermas y extra por
-  ingrediente. La lista se guarda con fecha y tiene casillas para ir marcando. Puedes compartirla por WhatsApp
+  ingrediente. La lista se guarda con fecha y tiene casillas para ir marcando; también guarda lo que tenías ese día para que lo consultes después (la siguiente lista empieza en cero). Puedes compartirla por WhatsApp
   o imprimirla, y al cerrarla capturas el total del ticket en MXN o USD ("Compré todo" marca lo que falte).
 - **Hoy**: el menú del día con horarios; marca "Lo comí" en cada comida y escribe una nota del día.
 - **Progreso**: peso, cintura y % de grasa con gráfica; cumplimiento de la dieta (mapa de las últimas 12 semanas,
