@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mi Dieta</title>
+  <meta name="description" content="Planea tu dieta, tus platillos y tu lista de compras.">
+  <meta name="theme-color" content="#2f7d4f" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14211a" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Mi Dieta">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    // Aplica el tema antes de pintar para evitar parpadeo.
+    try {
+      var p = JSON.parse(localStorage.getItem('midieta.prefs.v1') || '{}');
+      if (p.theme === 'light' || p.theme === 'dark') document.documentElement.setAttribute('data-theme', p.theme);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Navegación principal">
+      <div class="brand">
+        <img src="icons/icon.svg" alt="" width="32" height="32">
+        <span>Mi Dieta</span>
+      </div>
+      <nav class="side-nav" id="side-nav"></nav>
+    </aside>
+
+    <div class="main-col">
+      <header class="topbar">
+        <div class="topbar-title">
+          <img class="topbar-logo" src="icons/icon.svg" alt="" width="28" height="28">
+          <h1 id="page-title">Mi Dieta</h1>
+        </div>
+        <a class="sync-pill" id="sync-pill" href="#/ajustes" title="Sincronización"></a>
+      </header>
+      <main id="view" class="view" tabindex="-1"></main>
+    </div>
+
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Navegación"></nav>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <noscript><p class="noscript">Esta aplicación necesita JavaScript activado.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
