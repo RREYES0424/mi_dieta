@@ -17,7 +17,18 @@ Funciona en PC, tablet y celular, se puede instalar como app y funciona sin inte
   de cada ingrediente (o tocas "Lo tengo") y solo pide lo que falta; también puedes ajustar mermas y extra por
   ingrediente. La lista se guarda con fecha y tiene casillas para ir marcando; también guarda lo que tenías ese día para que lo consultes después (la siguiente lista empieza en cero). Puedes compartirla por WhatsApp
   o imprimirla, y al cerrarla capturas el total del ticket en MXN o USD ("Compré todo" marca lo que falte).
-- **Hoy**: el menú del día con horarios; marca "Lo comí" en cada comida y escribe una nota del día.
+- **Hoy**: el menú del día con horarios; marca "Lo comí" en cada comida y escribe una nota del día. Si comiste otra
+  cosa, toca "Comí otra cosa", describe qué fue y sus macros: no cuenta para el cumplimiento, pero sí suma a lo que comiste.
+- **Macros del platillo**: si tu nutriólogo te da los macros de un platillo, captúralos en el platillo y se usan en lugar
+  de los de los ingredientes.
+- **Precios**: captura lo que pagas por cada artículo al cerrar la compra. La app promedia tus últimas compras
+  (por defecto 3, configurable) para estimar el costo de la lista, de cada platillo y de cada día de dieta, y te muestra
+  cuánto han subido o bajado tus ingredientes. También puedes poner un precio de referencia por ingrediente.
+- **Historial de dietas**: cada vez que cambias de dieta activa queda registrado; en Progreso ves cada periodo con su
+  cumplimiento, cambio de peso, calorías y gasto.
+- **Recordatorios** a la hora de cada comida (con la app abierta o en segundo plano; mejor con la app instalada).
+- **Búsqueda** en toda la app (botón de lupa o tecla `/` en PC) y **tutorial** de bienvenida.
+- **Papelera** para recuperar lo que borres y **versiones guardadas** del gist para regresar todo a como estaba.
 - **Progreso**: peso, cintura y % de grasa con gráfica; cumplimiento de la dieta (mapa de las últimas 12 semanas,
   porcentaje y racha); promedio de calorías y macros que comiste contra la meta; historial de registros y compras.
 - **Gastos**: total por mes, últimos 30 días, promedio semanal y una gráfica de los últimos 12 meses.
@@ -76,7 +87,9 @@ de tu cuenta de GitHub. Solo necesitas un token; el gist lo crea la app.
 - Un gist "secreto" no aparece en búsquedas ni en tu perfil, pero cualquiera que tenga su enlace exacto puede verlo.
   No guardes ahí nada sensible.
 - Si editas en dos dispositivos, los datos se combinan registro por registro y gana el cambio más reciente.
-- Puedes descargar un respaldo en **Ajustes › Respaldo** cuando quieras.
+- Puedes descargar un respaldo en **Ajustes › Respaldo** cuando quieras. Ahí mismo están las **versiones guardadas**
+  (GitHub guarda una cada vez que la app sube cambios) para regresar tus datos a una fecha anterior.
+- Si sabes cuándo vence tu token, escríbelo en **Ajustes › Sincronización** y la app te avisará una semana antes.
 
 ## Instalar como app
 
@@ -93,7 +106,10 @@ js/app.js               Arranque y navegación
 js/store.js             Datos locales y combinación para sincronizar
 js/sync.js              Sincronización con el gist
 js/calc.js              Cálculos: menú, necesidades, mermas, macros
-js/tracking.js          Registro diario (comidas hechas) y peso
+js/tracking.js          Registro diario, reemplazos, peso e historial de dietas
+js/prices.js            Precios, promedios y costos
+js/reminders.js         Recordatorios de comida
+js/tutorial.js          Tutorial de bienvenida
 js/units.js             Unidades y conversiones
 js/ui.js                Componentes de interfaz
 js/views/*.js           Pantallas

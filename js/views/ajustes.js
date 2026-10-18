@@ -1,8 +1,11 @@
 // Ajustes: sincronización con gist, apariencia, moneda, respaldo e instalación.
 import * as S from '../store.js';
 import * as Sync from '../sync.js';
-import { h, btn, field, select, segmented, numInput, confirmDialog, toast, icon, fmtDateTime } from '../ui.js';
-import { refresh } from '../nav.js';
+import { h, btn, field, select, segmented, numInput, confirmDialog, toast, icon, fmtDateTime, modal, toggle } from '../ui.js';
+import { reset as resetVersions } from './versiones.js';
+import * as Rem from '../reminders.js';
+import { AVG_OPTIONS, avgN } from '../prices.js';
+import { refresh, go } from '../nav.js';
 
 let installEvent = null;
 window.addEventListener('beforeinstallprompt', e => {
@@ -71,15 +74,88 @@ function syncCard() {
       h('dt', null, 'Cuenta'), h('dd', null, '@' + cfg.login),
       h('dt', null, 'Gist'), h('dd', null, h('a', { href: `https://gist.github.com/${cfg.login}/${cfg.gistId}`, target: '_blank', rel: 'noopener' }, cfg.gistId.slice(0, 10) + '…')),
       h('dt', null, 'Estado'), h('dd', { class: st.status === 'error' ? 'err-text' : '' }, labels[st.status] || st.status, st.message && st.status === 'error' ? ` — ${st.message}` : ''),
-      h('dt', null, 'Última vez'), h('dd', null, cfg.lastSync ? fmtDateTime(cfg.lastSync) : '—')),
+      h('dt', null, 'Última vez'), h('dd', null, cfg.lastSync ? fmtDateTime(cfg.lastSync) : '—'),
+      h('dt', null, 'Token vence'), h('dd', null, expiryText())),
+    cfg.tokenExpires ? null : field('¿Cuándo vence tu token? (opcional)', h('input', {
+      class: 'input', type: 'date', value: cfg.manualExpires || '', 'data-k': 'tok-exp',
+      onchange: e => { Sync.setManualExpiry(e.target.value); refresh(); },
+    }), 'Es la fecha que elegiste en "Expiration" al crearlo. Te avisaremos una semana antes.'),
     h('p', { class: 'muted small' }, 'Los cambios se suben solos unos segundos después de hacerlos y se descargan al abrir la app. Si editas en dos dispositivos, se combinan registro por registro (gana el cambio más reciente).'),
     h('div', { class: 'btn-row' },
       btn('Sincronizar ahora', () => Sync.syncNow(), { kind: 'primary', icon: 'sync' }),
+      btn('Cambiar token', () => openTokenChange(), { kind: 'ghost', icon: 'lock' }),
       btn('Desconectar este dispositivo', async () => {
         if (!(await confirmDialog('Este dispositivo dejará de sincronizar. Tus datos se quedan aquí y en el gist.', { ok: 'Desconectar' }))) return;
         Sync.disconnect();
         refresh();
       }, { kind: 'ghost' })));
+}
+
+function expiryText() {
+  const d = Sync.tokenExpiry();
+  if (!d) return 'No sé la fecha';
+  const days = Math.ceil((d - Date.now()) / 86400000);
+  const when = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (days < 0) return `Venció el ${when}`;
+  return `${when} (${days} día${days === 1 ? '' : 's'})`;
+}
+
+function openTokenChange() {
+  let tok = '';
+  const inp = h('input', { class: 'input', type: 'password', autocomplete: 'off', placeholder: 'ghp_…', oninput: e => { tok = e.target.value; } });
+  modal({
+    title: 'Cambiar token',
+    body: h('div', { class: 'stack' },
+      h('p', { class: 'muted small' }, 'Pega el token nuevo. Se usa el mismo gist; tus datos no cambian.'),
+      h('details', { class: 'help' }, h('summary', null, '¿Cómo obtengo un token nuevo?'), tokenSteps()),
+      field('Token nuevo', inp)),
+    actions: [
+      { label: 'Cancelar', kind: 'ghost' },
+      {
+        label: 'Guardar', kind: 'primary', onClick: async () => {
+          try {
+            await Sync.connect(tok, Sync.config().gistId);
+            toast('Token actualizado', 'ok');
+            refresh();
+          } catch (e) {
+            toast(e.message || 'No se pudo conectar', 'err', 4000);
+            return false;
+          }
+        },
+      },
+    ],
+  });
+}
+
+function remindersCard(standalone, isIos) {
+  const st = Rem.settings();
+  const perm = Rem.permission();
+  const permText = {
+    granted: 'Notificaciones permitidas.',
+    denied: 'Bloqueaste las notificaciones para esta página: actívalas en la configuración del navegador. Mientras, verás el aviso dentro de la app.',
+    default: 'El navegador te pedirá permiso para mostrar notificaciones.',
+    unsupported: 'Este navegador no muestra notificaciones; verás el aviso dentro de la app.',
+  }[perm];
+  return h('section', { class: 'card' },
+    h('h2', null, icon('clock'), ' Recordatorios de comida'),
+    toggle(st.enabled, async v => {
+      if (v) await Rem.enable(); else Rem.disable();
+      refresh();
+    }, 'Avisarme a la hora de cada comida', 'Solo en este dispositivo. No avisa de comidas que ya marcaste como hechas.'),
+    st.enabled ? field('Avisar', select([0, 5, 10, 15, 30].map(m => ({ value: m, label: m ? `${m} minutos antes` : 'A la hora exacta' })), st.offset, v => { Rem.setOffset(v); refresh(); })) : null,
+    st.enabled ? h('p', { class: 'muted small' }, permText) : null,
+    h('p', { class: 'muted small' }, isIos
+      ? 'En iPhone los avisos solo funcionan con la app instalada en la pantalla de inicio (iOS 16.4 o más) y mientras siga abierta en segundo plano.'
+      : 'Como la app no usa servidor, los avisos llegan mientras la app esté abierta o en segundo plano.' + (standalone ? '' : ' Funcionan mejor con la app instalada.')),
+    st.enabled ? btn('Probar aviso', async () => {
+      if (Rem.permission() === 'granted') {
+        try {
+          const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+          if (reg) await reg.showNotification('Mi Dieta', { body: 'Así se verán tus recordatorios.', icon: 'icons/icon-192.png', data: { url: './#/hoy' } });
+          else new Notification('Mi Dieta', { body: 'Así se verán tus recordatorios.' });
+        } catch (e) { toast('No se pudo mostrar la notificación', 'err'); }
+      } else toast('Así se verán tus recordatorios dentro de la app.', 'ok', 5000);
+    }, { kind: 'ghost', small: true, icon: 'clock' }) : null);
 }
 
 function exportData() {
@@ -126,8 +202,10 @@ export function render() {
       })),
     h('section', { class: 'card form-grid' },
       h('h2', { class: 'span-2' }, 'Compras'),
+      field('Promedio de precios', select(AVG_OPTIONS.map(n => ({ value: n, label: n === 1 ? 'Solo la última compra' : `Últimas ${n} compras` })), avgN(), v => S.setSettings({ priceAvgN: Number(v) })), 'Para estimar el costo de tus listas, platillos y dietas.'),
       field('Moneda predeterminada', select([{ value: 'MXN', label: 'MXN (peso mexicano)' }, { value: 'USD', label: 'USD (dólar)' }], st.currency || 'MXN', v => S.setSettings({ currency: v }))),
       field('Tipo de cambio (MXN por 1 USD)', numInput(st.exchangeRate || null, v => S.setSettings({ exchangeRate: v || 0 }), { k: 'set-rate', placeholder: 'Ej. 18.50' }), 'Para ver todos tus gastos juntos en pesos.')),
+    remindersCard(standalone, isIos),
     !standalone ? h('section', { class: 'card' },
       h('h2', null, 'Instalar en tu dispositivo'),
       installEvent
@@ -146,7 +224,9 @@ export function render() {
       h('p', { class: 'muted small' }, 'Descarga un archivo con todos tus datos o restaura uno anterior.'),
       h('div', { class: 'btn-row' },
         btn('Descargar respaldo', exportData, { icon: 'download', kind: 'ghost' }),
-        btn('Importar respaldo', importData, { icon: 'upload', kind: 'ghost' }))),
+        btn('Importar respaldo', importData, { icon: 'upload', kind: 'ghost' }),
+        Sync.config().connected ? btn('Versiones guardadas', () => { resetVersions(); go('versiones'); }, { icon: 'clock', kind: 'ghost' }) : null,
+        btn('Papelera', () => go('papelera'), { icon: 'trash', kind: 'ghost' }))),
     h('section', { class: 'card danger-zone' },
       h('h2', null, 'Zona de riesgo'),
       h('p', { class: 'muted small' }, 'Borra los datos solo de este dispositivo y lo desconecta. Si tienes sincronización, tus datos siguen en el gist y vuelven al reconectar.'),

@@ -656,3 +656,62 @@ button { font: inherit; color: inherit; }
   :root:not([data-theme="light"]) { --heat-1: #27322b; --heat-2: #2b5039; --heat-3: #3d8a5a; --heat-4: #6fd096; }
 }
 :root[data-theme="dark"] { --heat-1: #27322b; --heat-2: #2b5039; --heat-3: #3d8a5a; --heat-4: #6fd096; }
+
+/* Historial de dietas */
+.periods { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.period { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px; }
+.period.current { border-color: var(--accent); }
+.period-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.period-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.period-stats strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .period-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.since { display: block; }
+
+/* Barra superior, aviso, búsqueda y tutorial */
+.topbar-actions { display: flex; align-items: center; gap: 6px; }
+.app-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 12px 16px 0; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--warn-soft); color: var(--warn); font-weight: 600; font-size: .9rem;
+}
+.app-banner[hidden] { display: none; }
+@media (min-width: 900px) { .app-banner { margin: 16px 28px 0; } }
+.search-big .input { min-height: 50px; font-size: 1.05rem; }
+.menu-item { width: 100%; text-align: left; border: 1px solid var(--border); cursor: pointer; font: inherit; }
+.tutorial { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 8px 4px; }
+.tutorial-icon { width: 64px; height: 64px; border-radius: 18px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+.tutorial-icon .ico { width: 34px; height: 34px; }
+.tutorial p { color: var(--muted); max-width: 46ch; }
+.tutorial-dots { display: flex; gap: 6px; }
+.tutorial-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.tutorial-dots .dot.active { background: var(--accent); width: 20px; border-radius: 4px; }
+.tutorial-nav { justify-content: center; width: 100%; }
+.tutorial-nav .btn { flex: 1 1 0; max-width: 200px; }
+.version-row .row-title { display: flex; align-items: center; gap: 8px; }
+
+/* Precios */
+.ok-text { color: var(--ok); }
+.estimate { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.cost-line { color: var(--accent); font-weight: 600; }
+.cost-figures { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 2px; }
+.price-paid { font-weight: 700; color: var(--accent); }
+.price-now { display: flex; flex-direction: column; align-items: flex-end; text-align: right; white-space: nowrap; }
+.price-box { display: flex; flex-direction: column; gap: 8px; }
+.price-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.price-stats > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-2); min-width: 0; }
+.price-stats strong { overflow-wrap: anywhere; font-size: .92rem; }
+@media (max-width: 520px) { .price-stats { grid-template-columns: 1fr; } }
+.price-inputs { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.price-inputs li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.price-inputs li:first-child { border-top: 0; }
+.price-inputs .input { width: 110px; flex: 0 0 auto; }
+.ticket-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.ticket-summary > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-2); }
+
+/* Reemplazos en Hoy */
+.badge-warn { background: var(--warn-soft); color: var(--warn); }
+.meal-today.swapped { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.swap-box { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warn-soft); }
+.swap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.swap-text { font-weight: 600; }
+.modal-card:focus { outline: none; }

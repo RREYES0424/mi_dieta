@@ -150,7 +150,21 @@ export function lineMacros(it, factor = 1) {
   return m;
 }
 
+// Macros que alguien (por ejemplo, el nutriólogo) capturó directamente en el platillo.
+export function hasOwnMacros(r) {
+  return !!(r && r.macros && ['kcal', 'prot', 'carb', 'fat'].some(k => Number(r.macros[k]) > 0));
+}
+
+// Macros de un platillo por porción × factor: los capturados en el platillo o, si no hay,
+// la suma de sus ingredientes.
 export function recipeMacros(r, factor = 1) {
+  if (hasOwnMacros(r)) {
+    const mac = r.macros;
+    return {
+      kcal: (Number(mac.kcal) || 0) * factor, prot: (Number(mac.prot) || 0) * factor,
+      carb: (Number(mac.carb) || 0) * factor, fat: (Number(mac.fat) || 0) * factor, missing: false, own: true,
+    };
+  }
   let m = zeroMacros();
   for (const it of (r && r.items) || []) m = addMacros(m, lineMacros(it, factor));
   return m;
@@ -172,7 +186,8 @@ export function dayMacros(plan, wd) {
 }
 
 export function anyMacros() {
-  return S.all('ingredients').some(i => i.macros && ['kcal', 'prot', 'carb', 'fat'].some(k => Number(i.macros[k]) > 0));
+  return S.all('ingredients').some(i => i.macros && ['kcal', 'prot', 'carb', 'fat'].some(k => Number(i.macros[k]) > 0)) ||
+    S.all('recipes').some(hasOwnMacros);
 }
 
 // ---------- Dinero ----------

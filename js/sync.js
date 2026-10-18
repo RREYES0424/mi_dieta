@@ -40,7 +40,36 @@ export function getStatus() {
 }
 
 export function config() {
-  return { login: cfg.login || '', gistId: cfg.gistId || '', lastSync: cfg.lastSync || 0, connected: !!cfg.token };
+  return {
+    login: cfg.login || '', gistId: cfg.gistId || '', lastSync: cfg.lastSync || 0, connected: !!cfg.token,
+    tokenExpires: cfg.tokenExpires || '', manualExpires: cfg.manualExpires || '',
+  };
+}
+
+// Fecha en que vence el token: la que informa GitHub o la que escribió el usuario.
+export function tokenExpiry() {
+  const raw = cfg.tokenExpires || cfg.manualExpires;
+  if (!raw) return null;
+  const d = new Date(String(raw).replace(' UTC', 'Z').replace(' ', 'T'));
+  return isNaN(d) ? null : d;
+}
+
+export function setManualExpiry(iso) {
+  cfg.manualExpires = iso || '';
+  saveCfg();
+  setState({});
+}
+
+// Versiones anteriores del gist (GitHub guarda cada cambio).
+export async function listVersions(page = 1) {
+  if (!cfg.token || !cfg.gistId) return [];
+  const list = await api(`/gists/${cfg.gistId}/commits?per_page=30&page=${page}`);
+  return list.map(v => ({ sha: v.version, date: v.committed_at }));
+}
+
+export async function getVersion(sha) {
+  const gist = await api(`/gists/${cfg.gistId}/${sha}`);
+  return readGistData(gist);
 }
 
 class SyncError extends Error {
@@ -63,6 +92,9 @@ async function api(path, opts = {}, token = cfg.token) {
   } catch (e) {
     throw new SyncError('Sin conexión', 'offline');
   }
+  // GitHub manda la fecha de vencimiento del token (si el navegador la deja leer).
+  const exp = res.headers.get('github-authentication-token-expiration');
+  if (exp && token === cfg.token && cfg.tokenExpires !== exp) { cfg.tokenExpires = exp; saveCfg(); }
   if (res.status === 401) throw new SyncError('El token no es válido o ya venció.', 'auth');
   if (res.status === 403) throw new SyncError('GitHub rechazó la petición. Revisa que el token tenga permiso "gist".', 'auth');
   if (res.status === 404) throw new SyncError('No se encontró el gist.', 'notfound');
@@ -120,7 +152,7 @@ export async function connect(token, gistId = '') {
       }, token);
       id = created.id;
     }
-    cfg = { token, gistId: id, login: user.login, lastSync: 0 };
+    cfg = { token, gistId: id, login: user.login, lastSync: 0, manualExpires: cfg.manualExpires || '' };
     saveCfg();
     await syncNow();
     return config();

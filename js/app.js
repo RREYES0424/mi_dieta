@@ -12,6 +12,12 @@ import * as Progreso from './views/progreso.js';
 import * as Gastos from './views/gastos.js';
 import * as Ajustes from './views/ajustes.js';
 import * as Mas from './views/mas.js';
+import * as Buscar from './views/buscar.js';
+import * as Papelera from './views/papelera.js';
+import * as Versiones from './views/versiones.js';
+import * as Reminders from './reminders.js';
+import { ensureHistory } from './tracking.js';
+import { shouldShow as tutorialPending, showTutorial } from './tutorial.js';
 
 const NAV = [
   { path: 'hoy', label: 'Hoy', icon: 'today', mobile: true },
@@ -27,6 +33,7 @@ const NAV = [
 const ROUTES = {
   hoy: Hoy, dieta: Dieta, platillos: Platillos, ingredientes: Ingredientes,
   compras: Compras, progreso: Progreso, gastos: Gastos, ajustes: Ajustes, mas: Mas,
+  buscar: Buscar, papelera: Papelera, versiones: Versiones,
 };
 
 function parseHash() {
@@ -44,7 +51,7 @@ function renderNav(path) {
   const side = document.getElementById('side-nav');
   side.replaceChildren(...NAV.map(n => navLink(n, n.path === path, 'side-link')));
   const bottom = document.getElementById('bottom-nav');
-  const inMore = !NAV.find(n => n.path === path && n.mobile);
+  const inMore = path !== 'buscar' && !NAV.find(n => n.path === path && n.mobile);
   bottom.replaceChildren(
     ...NAV.filter(n => n.mobile).map(n => navLink(n, n.path === path, 'tab-link')),
     navLink({ path: 'mas', label: 'Más', icon: 'more' }, inMore, 'tab-link'),
@@ -125,8 +132,34 @@ function renderSyncPill(st) {
   pill.replaceChildren(icon(m.icon, st.status === 'syncing' ? 'spin' : ''), h('span', null, m.text));
 }
 
+// Aviso arriba de la pantalla: token por vencer o rechazado.
+function renderBanner() {
+  const box = document.getElementById('app-banner');
+  const st = Sync.getStatus();
+  const exp = Sync.tokenExpiry();
+  let msg = '';
+  if (Sync.config().connected) {
+    if (st.status === 'error' && /token/i.test(st.message || '')) msg = 'Tu token de GitHub ya no funciona. Pega uno nuevo para seguir sincronizando.';
+    else if (exp) {
+      const days = Math.ceil((exp - Date.now()) / 86400000);
+      if (days < 0) msg = 'Tu token de GitHub venció. Pega uno nuevo para seguir sincronizando.';
+      else if (days <= 7) msg = `Tu token de GitHub vence en ${days} día${days === 1 ? '' : 's'}. Crea uno nuevo y cámbialo en Ajustes.`;
+    }
+  }
+  box.hidden = !msg;
+  box.replaceChildren(...(msg ? [icon('alert'), h('span', null, msg), h('a', { href: '#/ajustes', class: 'btn btn-sm' }, 'Ir a Ajustes')] : []));
+}
+
 function boot() {
   setRenderer(scheduleRender);
+  document.getElementById('search-btn').replaceChildren(icon('search'));
+  document.addEventListener('keydown', e => {
+    const t = e.target;
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !document.querySelector('dialog[open]')) {
+      e.preventDefault();
+      location.hash = '#/buscar';
+    }
+  });
   window.addEventListener('hashchange', render);
   S.subscribe(source => {
     if (source === 'remote' && isEditing()) {
@@ -142,10 +175,14 @@ function boot() {
     }
     scheduleRender();
   });
-  Sync.onStatus(renderSyncPill);
+  Sync.onStatus(st => { renderSyncPill(st); renderBanner(); });
   Sync.init();
+  // El historial de dietas se crea después de traer los datos de la nube (si hay).
+  Promise.resolve(Sync.syncNow()).catch(() => {}).finally(() => ensureHistory());
+  Reminders.init();
   if (!location.hash) history.replaceState(null, '', '#/hoy');
   render();
+  if (tutorialPending()) setTimeout(showTutorial, 400);
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* sin modo sin conexión */ });

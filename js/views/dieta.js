@@ -1,15 +1,17 @@
 // Dietas (planes): tiempos de comida con horario y platillos; personalizables por día.
 import * as S from '../store.js';
-import { h, btn, iconBtn, field, numInput, textInput, select, modal, confirmDialog, promptDialog, toast, empty, icon, segmented, fmtTime } from '../ui.js';
-import { mealsFor, entriesMacros, dayMacros, anyMacros, DAY_SHORT, DAY_NAMES, WEEK_ORDER } from '../calc.js';
+import { h, btn, iconBtn, field, numInput, textInput, select, modal, confirmDialog, promptDialog, toast, empty, icon, segmented, fmtTime, fmtDate } from '../ui.js';
+import { mealsFor, entriesMacros, dayMacros, anyMacros, DAY_SHORT, DAY_NAMES, WEEK_ORDER, parseIsoDate, fmtMoney } from '../calc.js';
 import { macrosLine } from './platillos.js';
 import { refresh, go } from '../nav.js';
+import { setActivePlan, periods } from '../tracking.js';
+import { entriesCost, dayCost, costText, anyPrices } from '../prices.js';
 
 let dayTab = 'all';
 let tabFor = '';
 
 function setActive(p) {
-  S.setSettings({ activePlanId: p.id });
+  setActivePlan(p.id);
   toast(`"${p.name}" es tu dieta activa`, 'ok');
 }
 
@@ -17,7 +19,7 @@ async function createPlan() {
   const name = await promptDialog('Nueva dieta', '', { placeholder: 'Ej. Dieta definición' });
   if (!name) return;
   const p = S.put('plans', { name, meals: [], overrides: {} });
-  if (!S.get('plans', S.settings().activePlanId)) S.setSettings({ activePlanId: p.id });
+  if (!S.get('plans', S.settings().activePlanId)) setActivePlan(p.id);
   go('dieta/' + p.id);
 }
 
@@ -40,7 +42,7 @@ async function deletePlan(p) {
   S.remove('plans', p.id);
   if (S.settings().activePlanId === p.id) {
     const other = S.all('plans').sort(S.byName)[0];
-    S.setSettings({ activePlanId: other ? other.id : '' });
+    setActivePlan(other ? other.id : '');
   }
   toast('Dieta eliminada');
   return true;
@@ -178,7 +180,25 @@ function mealCard(p, meal) {
           : btn('Personalizar', () => setEntries(p, meal.id, (meal.entries || []).map(e => ({ ...e }))), { small: true, kind: 'ghost', icon: 'edit' })),
     !general && !overridden ? h('p', { class: 'muted small' }, 'Igual que todos los días.') : null,
     entryList(p, meal, shownEntries, general || overridden),
+    anyPrices() && costText(entriesCost(shownEntries), S.settings().currency || 'MXN') ? h('p', { class: 'cost-line small' }, costText(entriesCost(shownEntries), S.settings().currency || 'MXN')) : null,
     mealsSorted.length && general && !meal.time ? h('p', { class: 'hint' }, 'Tip: ponle hora para ordenarlo.') : null);
+}
+
+// Costo de la dieta: el día elegido y el promedio de la semana.
+function costCard(p) {
+  if (!anyPrices()) return null;
+  const cur = S.settings().currency || 'MXN';
+  const day = dayTab === 'all' ? dayCost({ ...p, overrides: {} }, null, cur) : dayCost(p, Number(dayTab), cur);
+  const week = [0, 1, 2, 3, 4, 5, 6].map(wd => dayCost(p, wd, cur));
+  const weekTotal = week.reduce((s, c) => s + c.total, 0);
+  const missing = week.some(c => c.missing);
+  if (!day.priced && !weekTotal) return null;
+  return h('div', { class: 'card totals-card' },
+    h('span', { class: 'muted small' }, dayTab === 'all' ? 'Costo por día' : `Costo del ${DAY_NAMES[Number(dayTab)].toLowerCase()}`),
+    h('span', { class: 'cost-figures' },
+      h('strong', null, costText(day, cur).replace(' (faltan precios)', '')),
+      h('span', { class: 'muted small' }, ` · semana ≈ ${fmtMoney(weekTotal, cur)}`),
+      missing ? h('span', { class: 'warn-text small' }, ' · faltan precios') : null));
 }
 
 function editor(id) {
@@ -206,6 +226,7 @@ function editor(id) {
       ? h('p', { class: 'muted small' }, `${DAY_NAMES[Number(dayTab)]}: toca "Personalizar" en un tiempo de comida para cambiar lo que comes solo ese día. Los días con cambios tienen un punto.`)
       : h('p', { class: 'muted small' }, 'Lo que pongas aquí se repite todos los días, salvo los días que personalices.'),
     totals ? h('div', { class: 'card totals-card' }, h('span', { class: 'muted small' }, dayTab === 'all' ? 'Total por día' : `Total del ${DAY_NAMES[Number(dayTab)].toLowerCase()}`), macrosLine(totals) || h('span', { class: 'muted small' }, 'Sin macros')) : null,
+    costCard(p),
     meals.length ? h('div', { class: 'meal-list' }, meals.map(m => mealCard(p, p.meals.find(x => x.id === m.id))))
       : empty('Sin tiempos de comida', 'Agrega desayuno, comida, cena o los que necesites.'),
     dayTab === 'all' ? h('div', { class: 'btn-row' }, btn('Agregar tiempo de comida', () => addMeal(p), { kind: 'primary', icon: 'plus' })) : null,
@@ -225,6 +246,8 @@ export function render(params) {
   if (params[0]) return editor(params[0]);
   const plans = S.all('plans').sort(S.byName);
   const activeId = S.settings().activePlanId;
+  const cur = periods().filter(x => x.current)[0];
+  const since = cur && cur.planId === activeId ? cur.start : '';
   const el = h('div', { class: 'page' },
     h('div', { class: 'toolbar' },
       h('p', { class: 'muted grow' }, 'Tus dietas guardadas. La dieta activa es la que se usa en "Hoy" y para la lista de compras.'),
@@ -236,6 +259,7 @@ export function render(params) {
         return h('article', { class: 'card card-link' + (p.id === activeId ? ' card-active' : ''), onclick: () => go('dieta/' + p.id) },
           h('div', { class: 'card-head' },
             h('h3', null, p.name, p.id === activeId ? h('span', { class: 'badge badge-ok' }, 'Activa') : null),
+            p.id === activeId && since ? h('span', { class: 'muted small since' }, `desde ${fmtDate(parseIsoDate(since), { day: 'numeric', month: 'short' })}`) : null,
             h('div', { class: 'row-actions', onclick: e => e.stopPropagation() },
               p.id !== activeId ? iconBtn('star', 'Usar esta dieta', () => setActive(p)) : null,
               iconBtn('edit', 'Renombrar', () => renamePlan(p)),

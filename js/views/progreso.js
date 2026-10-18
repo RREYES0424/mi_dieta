@@ -1,9 +1,9 @@
 // Progreso: peso y medidas, cumplimiento de la dieta, promedios e historial.
 import * as S from '../store.js';
-import { h, btn, iconBtn, field, numInput, segmented, modal, confirmDialog, toast, fmtDate, chartWidth, niceStep } from '../ui.js';
+import { h, btn, iconBtn, field, numInput, segmented, modal, confirmDialog, toast, fmtDate, chartWidth, niceStep, select } from '../ui.js';
 import { isoDate, parseIsoDate, addDays, startOfDay, dayMacros, activePlan, anyMacros, fmtMoney, WEEK_ORDER, DAY_SHORT } from '../calc.js';
 import { trimZeros } from '../units.js';
-import { bodyEntries, weightIn, weightToKg, lengthIn, lengthToCm, dayStats, recentLogs, streak, getLog } from '../tracking.js';
+import { bodyEntries, weightIn, weightToKg, lengthIn, lengthToCm, dayStats, recentLogs, streak, getLog, periods, periodStats, addHistoryEntry, moveHistoryEntry } from '../tracking.js';
 import { openDay } from './hoy.js';
 import { go } from '../nav.js';
 
@@ -162,6 +162,70 @@ function weightSection() {
       : null);
 }
 
+// ---------- Dietas que has seguido ----------
+
+function shortDate(iso) {
+  return fmtDate(parseIsoDate(iso), { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function openHistoryEditor(period) {
+  const plans = S.all('plans').sort(S.byName);
+  if (!plans.length) { toast('Primero crea una dieta', 'warn'); return; }
+  const today = isoDate(new Date());
+  let planId = period ? period.planId : plans[0].id;
+  const dateInp = h('input', { class: 'input', type: 'date', max: today, value: period ? period.start : today });
+  modal({
+    title: period ? 'Cambiar inicio de la dieta' : 'Agregar una dieta anterior',
+    body: h('div', { class: 'stack' },
+      period ? h('p', { class: 'muted small' }, period.planName)
+        : field('Dieta', select(plans.map(p => ({ value: p.id, label: p.name })), planId, v => { planId = v; })),
+      field('Empezó el', dateInp, 'La dieta dura hasta que empieza la siguiente.')),
+    actions: [
+      { label: 'Cancelar', kind: 'ghost' },
+      {
+        label: 'Guardar', kind: 'primary', onClick: () => {
+          const iso = dateInp.value;
+          if (!iso || iso > today) { toast('Elige una fecha de hoy o antes', 'warn'); return false; }
+          if (period) moveHistoryEntry(period.entries[0], iso);
+          else addHistoryEntry(iso, planId);
+          toast('Historial actualizado', 'ok');
+        },
+      },
+    ],
+  });
+}
+
+function dietsSection() {
+  const list = periods().slice().reverse();
+  const unit = S.settings().weightUnit || 'kg';
+  return h('section', { class: 'card' },
+    h('div', { class: 'card-head' },
+      h('h2', null, 'Dietas que has seguido'),
+      btn('Agregar', () => openHistoryEditor(null), { small: true, kind: 'ghost', icon: 'plus' })),
+    !list.length ? h('p', { class: 'muted small' }, 'Cuando cambies de dieta activa quedará registrado aquí, con tu avance en cada una.')
+      : h('ul', { class: 'periods' }, list.map(p => {
+        const st = periodStats(p);
+        const spend = Object.entries(st.spend).map(([c, v]) => fmtMoney(v, c)).join(' + ');
+        const dw = st.weightCount >= 2 ? weightIn(st.weightEnd - st.weightStart, unit) : null;
+        return h('li', { class: 'period' + (p.current ? ' current' : '') },
+          h('div', { class: 'card-head' },
+            h('div', null,
+              h('h3', null, p.planName, p.current ? h('span', { class: 'badge badge-ok' }, 'Actual') : null, !p.exists ? h('span', { class: 'badge' }, 'eliminada') : null),
+              h('p', { class: 'muted small' }, `${shortDate(p.start)} – ${p.current ? 'hoy' : shortDate(p.end)} · ${p.days} día${p.days === 1 ? '' : 's'}`)),
+            h('div', { class: 'row-actions' },
+              iconBtn('edit', 'Cambiar fecha de inicio', () => openHistoryEditor(p)),
+              iconBtn('trash', 'Quitar del historial', async () => {
+                if (!(await confirmDialog('Se quitará este periodo del historial (tus datos no se borran).', { ok: 'Quitar', danger: true }))) return;
+                p.entries.forEach(e => S.remove('planHistory', e.id));
+              }, { kind: 'danger' }))),
+          h('div', { class: 'period-stats' },
+            h('div', null, h('span', { class: 'muted small' }, 'Cumplimiento'), h('strong', null, st.adherence == null ? '—' : Math.round(st.adherence * 100) + '%')),
+            h('div', null, h('span', { class: 'muted small' }, 'Peso'), h('strong', null, dw == null ? '—' : signed(dw, unit))),
+            h('div', null, h('span', { class: 'muted small' }, 'Kcal/día'), h('strong', null, st.kcal == null ? '—' : String(Math.round(st.kcal)))),
+            h('div', null, h('span', { class: 'muted small' }, 'Gasto'), h('strong', null, spend || '—'))));
+      })));
+}
+
 // ---------- Cumplimiento ----------
 
 const WEEKS = 12;
@@ -222,7 +286,7 @@ function adherenceSection() {
 
 function averagesSection() {
   if (!anyMacros()) return null;
-  const logs = recentLogs(7).map(r => r.log).filter(Boolean).map(dayStats).filter(s => s.total && s.done);
+  const logs = recentLogs(7).map(r => r.log).filter(Boolean).map(dayStats).filter(s => s.total && (s.done || s.swapped));
   const plan = activePlan();
   let target = null;
   if (plan) {
@@ -256,6 +320,11 @@ function historySection() {
     t: l.closedAt || l.createdAt, kind: 'Compra', text: `${l.name}${Number(l.total) > 0 ? ' · ' + fmtMoney(l.total, l.currency || 'MXN') : ''}`, href: '#/compras/' + l.id,
   }));
   S.all('logs').filter(l => l.note).forEach(l => events.push({ t: parseIsoDate(l.date).getTime() + 2, kind: 'Nota', text: l.note }));
+  S.all('logs').forEach(l => Object.entries(l.swaps || {}).forEach(([mid, sw]) => {
+    if (!sw) return;
+    const meal = (l.meals || []).find(m => m.id === mid);
+    events.push({ t: parseIsoDate(l.date).getTime() + 3, kind: 'Otra comida', text: `${meal ? meal.name + ': ' : ''}${sw.text}${sw.kcal ? ` · ${Math.round(sw.kcal)} kcal` : ''}` });
+  }));
   events.sort((a, b) => b.t - a.t);
   const shown = events.slice(0, 40);
 
@@ -285,6 +354,7 @@ export function render() {
       stat('Últimos 30 días', base30 && last && base30 !== last ? signed(weightIn(last.weight - base30.weight, unit), unit) : '—'),
       stat('Racha', `${streak()} días`, 'con todas tus comidas')),
     weightSection(),
+    dietsSection(),
     adherenceSection(),
     averagesSection(),
     historySection(),

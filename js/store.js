@@ -6,7 +6,7 @@
 const LS_DATA = 'midieta.data.v1';
 const LS_PREFS = 'midieta.prefs.v1';
 
-export const COLLECTIONS = ['aisles', 'ingredients', 'recipes', 'plans', 'lists', 'logs', 'body'];
+export const COLLECTIONS = ['aisles', 'ingredients', 'recipes', 'plans', 'lists', 'logs', 'body', 'planHistory'];
 
 const DEFAULT_AISLES = [
   'Frutas y verduras', 'Carnes', 'Pescados y mariscos', 'Salchichonería', 'Lácteos y huevo',
@@ -146,11 +146,73 @@ export function putMany(col, recs) {
   emit('local');
 }
 
-export function remove(col, id) {
-  if (!data[col][id]) return;
-  data[col][id] = { id, deleted: true, updatedAt: now() };
+// Borrar deja el contenido en la papelera (para poder recuperarlo) y marca la lápida.
+export function remove(col, id, toTrash = true) {
+  const prev = data[col][id];
+  if (!prev || prev.deleted) return;
+  data[col][id] = toTrash
+    ? { ...prev, id, deleted: true, deletedAt: Date.now(), updatedAt: now() }
+    : { id, deleted: true, updatedAt: now() };
   persist();
   emit('local');
+}
+
+// Elementos borrados que todavía tienen contenido, del más reciente al más viejo.
+export function trash(cols) {
+  const out = [];
+  (cols || COLLECTIONS).forEach(col => {
+    Object.values(data[col] || {}).forEach(r => {
+      if (r.deleted && r.deletedAt) out.push({ col, rec: r });
+    });
+  });
+  return out.sort((a, b) => b.rec.deletedAt - a.rec.deletedAt);
+}
+
+export function restore(col, id) {
+  const r = data[col][id];
+  if (!r || !r.deleted) return null;
+  const rec = { ...r };
+  delete rec.deleted;
+  delete rec.deletedAt;
+  return put(col, rec);
+}
+
+// Borra el contenido de la papelera; las lápidas se quedan para la sincronización.
+export function emptyTrash(items) {
+  items.forEach(({ col, rec }) => {
+    data[col][rec.id] = { id: rec.id, deleted: true, updatedAt: now() };
+  });
+  persist();
+  emit('local');
+}
+
+// Deja los datos exactamente como en una copia anterior. Todo lo que cambia se marca
+// con la hora actual para que gane en la sincronización; lo que sobra va a la papelera.
+export function restoreSnapshot(old) {
+  const O = normalize(old);
+  COLLECTIONS.forEach(c => {
+    const ids = new Set([...Object.keys(O[c]), ...Object.keys(data[c])]);
+    ids.forEach(id => {
+      const o = O[c][id];
+      const cur = data[c][id];
+      if (o && !o.deleted) {
+        if (!cur || cur.deleted || JSON.stringify({ ...cur, updatedAt: 0 }) !== JSON.stringify({ ...o, updatedAt: 0 })) {
+          data[c][id] = { ...o, updatedAt: now() };
+        }
+      } else if (cur && !cur.deleted) {
+        data[c][id] = { ...cur, deleted: true, deletedAt: Date.now(), updatedAt: now() };
+      }
+    });
+  });
+  data.settings = { ...O.settings, updatedAt: now() };
+  persist();
+  emit('local');
+}
+
+export function counts(d) {
+  const N = normalize(d);
+  const n = c => Object.values(N[c]).filter(r => !r.deleted).length;
+  return { ingredients: n('ingredients'), recipes: n('recipes'), plans: n('plans'), lists: n('lists'), body: n('body'), logs: n('logs') };
 }
 
 export function setSettings(patch) {

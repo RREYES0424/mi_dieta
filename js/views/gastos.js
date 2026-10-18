@@ -3,6 +3,8 @@ import * as S from '../store.js';
 import { h, select, numInput, field, empty, fmtDate, chartWidth, niceStep } from '../ui.js';
 import { fmtMoney, startOfDay, addDays } from '../calc.js';
 import { refresh } from '../nav.js';
+import { priceInfo, fmtUnitPrice, avgN } from '../prices.js';
+import { openIngredientEditor } from './ingredientes.js';
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -155,8 +157,32 @@ export function render() {
               h('strong', { class: 'nowrap' }, fmtMoney(p.total, p.currency)))))
             : h('p', { class: 'muted' }, 'No hay compras en esta moneda.')),
       ],
+    pricesSection(cur),
   );
   return { title: 'Gastos', el };
+}
+
+// Cómo han cambiado los precios de cada ingrediente.
+function pricesSection(cur) {
+  const rows = S.all('ingredients').map(ing => ({ ing, pi: priceInfo(ing, cur) }))
+    .filter(x => x.pi && x.pi.source === 'historial')
+    .map(x => ({ ...x, change: x.pi.prev ? (x.pi.last - x.pi.prev) / x.pi.prev : null }))
+    .sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0) || S.byName(a.ing, b.ing));
+  return h('section', { class: 'card' },
+    h('h2', null, `Precios de tus ingredientes (${cur})`),
+    !rows.length ? h('p', { class: 'muted small' }, 'Captura lo que pagas por cada artículo al cerrar tus compras y aquí verás el promedio y cómo suben o bajan.')
+      : [
+        h('p', { class: 'muted small' }, `Promedio de tus últimas ${avgN()} compras. El cambio compara tu última compra contra las anteriores.`),
+        h('ul', { class: 'rows' }, rows.map(({ ing, pi, change }) => h('li', { class: 'row clickable', onclick: () => openIngredientEditor(ing) },
+          h('div', { class: 'row-main' },
+            h('div', { class: 'row-title' }, ing.name),
+            h('div', { class: 'row-sub' }, `Promedio ${fmtUnitPrice(pi.per, ing.buyUnit, cur)} · ${pi.total} compra${pi.total === 1 ? '' : 's'}`)),
+          h('div', { class: 'price-now' },
+            h('strong', null, fmtUnitPrice(pi.last, ing.buyUnit, cur)),
+            change != null && Math.abs(change) >= 0.005
+              ? h('span', { class: 'small ' + (change > 0 ? 'warn-text' : 'ok-text') }, `${change > 0 ? '▲' : '▼'} ${Math.abs(Math.round(change * 100))}%`)
+              : h('span', { class: 'muted small' }, 'sin cambio'))))),
+      ]);
 }
 
 function stat(label, value, hint) {

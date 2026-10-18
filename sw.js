@@ -1,6 +1,6 @@
 // Modo sin conexión: guarda los archivos de la app y los sirve si no hay internet.
 // Primero intenta la red (para recibir actualizaciones) y si falla usa la copia guardada.
-const CACHE = 'mi-dieta-v3';
+const CACHE = 'mi-dieta-v4';
 const FILES = [
   './',
   './index.html',
@@ -20,6 +20,12 @@ const FILES = [
   './js/views/compras.js',
   './js/views/progreso.js',
   './js/tracking.js',
+  './js/prices.js',
+  './js/reminders.js',
+  './js/tutorial.js',
+  './js/views/buscar.js',
+  './js/views/papelera.js',
+  './js/views/versiones.js',
   './js/views/gastos.js',
   './js/views/ajustes.js',
   './js/views/mas.js',
@@ -56,5 +62,22 @@ self.addEventListener('fetch', event => {
         return res;
       })
       .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html'))),
+  );
+});
+
+// Al tocar un recordatorio, abre la app en "Hoy".
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || './#/hoy';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if ('focus' in c) {
+          c.navigate && c.navigate(url).catch(() => {});
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
   );
 });

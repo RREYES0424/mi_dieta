@@ -2,9 +2,10 @@
 import * as S from '../store.js';
 import { h, btn, iconBtn, field, numInput, textInput, select, checkbox, modal, confirmDialog, promptDialog, toast, empty, icon, segmented } from '../ui.js';
 import { UNITS, RECIPE_UNITS } from '../units.js';
-import { recipeMacros, anyMacros } from '../calc.js';
+import { recipeMacros, anyMacros, hasOwnMacros } from '../calc.js';
 import { openIngredientEditor, findIngredientByName, unitOptions } from './ingredientes.js';
 import { refresh, go } from '../nav.js';
+import { recipeCost, costText, anyPrices } from '../prices.js';
 
 let search = '';
 let show = 'active';
@@ -18,6 +19,7 @@ export function macrosLine(m) {
     h('span', { class: 'macro' }, `P ${Math.round(m.prot)} g`),
     h('span', { class: 'macro' }, `C ${Math.round(m.carb)} g`),
     h('span', { class: 'macro' }, `G ${Math.round(m.fat)} g`),
+    m.own ? h('span', { class: 'macro muted', title: 'Capturados en el platillo' }, 'del platillo') : null,
     m.missing ? h('span', { class: 'macro muted', title: 'Algún ingrediente no tiene macros o no tiene equivalencia en gramos' }, 'incompleto') : null);
 }
 
@@ -181,6 +183,31 @@ export function openAddToPlan(r) {
   });
 }
 
+// Macros del platillo por porción (por ejemplo, los que da el nutriólogo).
+function ownMacrosCard(r) {
+  const mac = r.macros || {};
+  const set = (k, v) => {
+    const fresh = S.get('recipes', r.id) || r;
+    S.put('recipes', { ...fresh, macros: { ...(fresh.macros || {}), [k]: v == null ? null : Math.max(0, v) } });
+  };
+  const own = hasOwnMacros(r);
+  return h('section', { class: 'card' },
+    h('div', { class: 'card-head' },
+      h('h2', null, 'Macros del platillo (por porción)'),
+      own ? btn('Usar los de los ingredientes', () => {
+        const fresh = S.get('recipes', r.id) || r;
+        S.put('recipes', { ...fresh, macros: {} });
+      }, { small: true, kind: 'ghost' }) : null),
+    h('p', { class: 'muted small' }, own
+      ? 'Se usan estos macros (no los de los ingredientes). Las porciones de tu dieta los multiplican.'
+      : 'Si tu nutriólogo te dio los macros de este platillo, captúralos aquí. Si los dejas vacíos se calculan con los ingredientes.'),
+    h('div', { class: 'row-4' },
+      field('kcal', numInput(mac.kcal, v => set('kcal', v), { k: 'rm-kcal', placeholder: '0' })),
+      field('Proteína (g)', numInput(mac.prot, v => set('prot', v), { k: 'rm-prot', placeholder: '0' })),
+      field('Carbs (g)', numInput(mac.carb, v => set('carb', v), { k: 'rm-carb', placeholder: '0' })),
+      field('Grasa (g)', numInput(mac.fat, v => set('fat', v), { k: 'rm-fat', placeholder: '0' }))));
+}
+
 function editor(id) {
   const r = S.get('recipes', id);
   if (!r) {
@@ -206,9 +233,11 @@ function editor(id) {
     r.archived ? h('div', { class: 'banner' }, icon('archive'), 'Este platillo está archivado.', btn('Reactivar', () => S.put('recipes', { ...r, archived: false }), { small: true })) : null,
     h('section', { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', null, 'Ingredientes'), macrosLine(macros)),
+      anyPrices() && costText(recipeCost(r), S.settings().currency || 'MXN') ? h('p', { class: 'cost-line' }, 'Costo por porción ', costText(recipeCost(r), S.settings().currency || 'MXN')) : null,
       h('p', { class: 'muted small' }, 'Marca "Cocido" cuando la cantidad sea en peso cocido; la lista lo convertirá a crudo con la merma de cocción del ingrediente.'),
       ingredientDatalist('dl-ings'),
       h('ul', { class: 'lines' }, r.items.map((it, i) => lineRow(r, it, i)), addLine(r))),
+    ownMacrosCard(r),
     h('section', { class: 'card' },
       h('h2', null, 'Notas o preparación'),
       h('textarea', {
@@ -245,6 +274,8 @@ export function render(params) {
   const list = all.filter(r => (show === 'archived' ? r.archived : !r.archived) && (!q || r.name.toLowerCase().includes(q)));
   const archivedCount = all.filter(r => r.archived).length;
   const withMacros = anyMacros();
+  const withPrices = anyPrices();
+  const cur = S.settings().currency || 'MXN';
 
   const el = h('div', { class: 'page' },
     h('div', { class: 'toolbar' },
@@ -268,6 +299,7 @@ export function render(params) {
                 iconBtn('trash', 'Eliminar', () => deleteRecipe(r), { kind: 'danger' }))),
             h('p', { class: 'muted small' }, (r.items || []).map(it => (S.get('ingredients', it.ingId) || {}).name).filter(Boolean).join(', ') || 'Sin ingredientes'),
             withMacros ? macrosLine(recipeMacros(r)) : null,
+            withPrices && costText(recipeCost(r), cur) ? h('p', { class: 'cost-line small' }, costText(recipeCost(r), cur)) : null,
             uses.length ? h('p', { class: 'small tag-line' }, icon('plan'), uses.map(u => u.meal.name).filter((x, i, a) => a.indexOf(x) === i).join(', ')) : null);
         })),
   );

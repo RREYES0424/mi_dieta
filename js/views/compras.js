@@ -7,6 +7,7 @@ import {
   isoDate, parseIsoDate, addDays, fmtMoney,
 } from '../calc.js';
 import { refresh, go } from '../nav.js';
+import { priceInfo, fmtUnitPrice, boughtQty } from '../prices.js';
 
 const CURRENCIES = [{ value: 'MXN', label: 'MXN' }, { value: 'USD', label: 'USD' }];
 const LIST_UNITS = [
@@ -59,8 +60,10 @@ export function computeRows(g) {
     const ps = packSize(ing);
     const packs = ps > 0 && buy > 0 ? Math.ceil(buy / ps - 1e-9) : 0;
     const covered = buy <= 1e-9 && isZeroVec(rest);
+    const pi = priceInfo(ing);
+    const est = pi && buy > 0 ? pi.per * (packs ? packs * ps : buy) : null;
     out.push({
-      ing, slot, mc, mk, mg, dim, need, rest, have, buy, ps, packs, covered,
+      ing, slot, mc, mk, mg, dim, need, rest, have, buy, ps, packs, covered, est, priceSource: pi ? pi.source : '',
       include: ov.include ?? !covered,
       usedIn: [...slot.usedIn],
       hasCooked: !isZeroVec(slot.cooked),
@@ -105,6 +108,8 @@ export function freeze(g, rows) {
       usedIn: r.usedIn,
       checked: false,
       bought: null,
+      price: null,
+      est: r.est,
       note: '',
     };
   });
@@ -130,9 +135,20 @@ export function freeze(g, rows) {
     extras: [],
     total: null,
     currency: S.settings().currency || 'MXN',
+    estCurrency: S.settings().currency || 'MXN',
     status: 'open',
     closedAt: null,
   };
+}
+
+// Costo estimado de varios renglones: total y cuántos no tienen precio.
+function estimateLine(rows, currency) {
+  const withEst = rows.filter(r => r.est != null);
+  if (!withEst.length) return h('p', { class: 'muted small' }, 'Captura precios al cerrar tus compras y aquí verás cuánto costará la lista.');
+  const total = withEst.reduce((s, r) => s + r.est, 0);
+  const missing = rows.length - withEst.length;
+  return h('p', { class: 'estimate' }, h('span', { class: 'muted small' }, 'Costo estimado '), h('strong', null, '≈ ' + fmtMoney(total, currency)),
+    missing ? h('span', { class: 'muted small' }, ` · ${missing} sin precio`) : null);
 }
 
 // ---------- Generador ----------
@@ -181,6 +197,7 @@ function generator() {
         h('div', { class: 'gen-buy' },
           r.covered ? h('span', { class: 'badge badge-ok' }, 'Ya lo tienes') : h('strong', null, r.packs ? `${r.packs} × ${r.ing.pack.name || 'paquete'}` : fmtIn(r.buy, r.ing.buyUnit, { ceil: true })),
           r.packs ? h('span', { class: 'muted small' }, fmtIn(r.buy, r.ing.buyUnit)) : null,
+          r.include && r.est != null ? h('span', { class: 'muted small', title: r.priceSource === 'historial' ? 'Promedio de tus últimas compras' : 'Precio de referencia del ingrediente' }, '≈ ' + fmtMoney(r.est, S.settings().currency || 'MXN')) : null,
           r.rest && !isZeroVec(r.rest) ? h('span', { class: 'warn-text small', title: 'Define gramos por pieza en el ingrediente para convertir' }, '+ ' + restText(r.rest)) : null)),
       h('div', { class: 'gen-mid' },
         h('span', { class: 'muted small' }, 'Necesitas ', h('b', null, fmtIn(r.need, r.ing.buyUnit))),
@@ -207,6 +224,7 @@ function generator() {
         h('div', { class: 'card-head' },
           h('h2', null, `${included.length} de ${rows.length} ingredientes`),
           covered.length ? h('span', { class: 'muted small' }, `${covered.length} ya los tienes`) : null),
+        estimateLine(included, S.settings().currency || 'MXN'),
         h('ul', { class: 'gen-list' }, list)),
     rows.length ? h('div', { class: 'sticky-actions' },
       btn('Reiniciar ajustes', () => { gen = newGen(); refresh(); }, { kind: 'ghost' }),
@@ -240,14 +258,18 @@ function updateItem(l, id, patch) {
 
 function editItem(l, it) {
   const u = unitOf(it.unit);
-  const d = { buy: it.buy / u.f, bought: it.bought == null ? null : it.bought / u.f, note: it.note || '', packs: it.packs };
+  const d = { buy: it.buy / u.f, bought: it.bought == null ? null : it.bought / u.f, note: it.note || '', packs: it.packs, price: it.price ?? null };
+  const cur = l.currency || 'MXN';
+  const pi = it.ingId ? priceInfo(S.get('ingredients', it.ingId), cur) : null;
   modal({
     title: it.name,
     body: h('div', { class: 'stack' },
       it.packSize ? field(`Presentaciones (${it.packName})`, numInput(d.packs, v => { d.packs = Math.max(0, Math.round(v || 0)); })) : null,
       field(`Cantidad a comprar (${u.label})`, numInput(d.buy, v => { d.buy = v || 0; })),
       field(`Lo que compraste realmente (${u.label})`, numInput(d.bought, v => { d.bought = v; }, { placeholder: 'Igual a la lista' }), 'Opcional: si compraste de más o de menos, para tu registro.'),
-      field('Nota', textInput(d.note, v => { d.note = v; }, { placeholder: 'Ej. marca, precio…' })),
+      field(`Precio que pagaste por todo (${cur})`, numInput(d.price, v => { d.price = v; }, { placeholder: '0.00' }),
+        pi ? `Promedio: ${fmtUnitPrice(pi.per, it.unit, cur)}${pi.source === 'historial' ? ` (últimas ${pi.n} compras)` : ' (referencia)'}` : 'Con esto se calcula el precio promedio del ingrediente.'),
+      field('Nota', textInput(d.note, v => { d.note = v; }, { placeholder: 'Ej. marca, tienda…' })),
       h('p', { class: 'muted small' },
         `Necesitabas ${fmtIn(it.need, it.unit)} · tenías ${fmtIn(it.have, it.unit)}`,
         it.mermas ? ` · merma ${pctTxt(it.mermas.crudo)}, cocción ${pctTxt(it.mermas.cocido)}, extra ${pctTxt(it.mermas.extra)}` : '',
@@ -265,7 +287,7 @@ function editItem(l, it) {
           let buy = d.buy * u.f;
           // Si cambió el número de presentaciones, la cantidad sigue a las presentaciones.
           if (it.packSize && packs !== it.packs) buy = packs * it.packSize;
-          updateItem(fresh, it.id, { buy, packs, bought: d.bought == null ? null : d.bought * u.f, note: d.note.trim() });
+          updateItem(fresh, it.id, { buy, packs, bought: d.bought == null ? null : d.bought * u.f, note: d.note.trim(), price: d.price > 0 ? d.price : null });
         },
       },
     ],
@@ -299,9 +321,45 @@ function addCatalogItem(l) {
               aisleOrder: a ? S.sortedAisles().indexOf(a) : 999, unit: ing.buyUnit || 'g', dim: u.dim,
               need: buy, have: 0, buy, packName: ps ? (ing.pack.name || 'paquete') : '', packSize: ps,
               packs: ps && buy ? Math.ceil(buy / ps - 1e-9) : 0, extra: '', mermas: null, usedIn: [],
-              checked: false, bought: null, note: '',
+              checked: false, bought: null, price: null, note: '',
+              est: (() => { const pi = priceInfo(ing, fresh.estCurrency || fresh.currency || 'MXN'); return pi && buy ? pi.per * (ps ? Math.ceil(buy / ps - 1e-9) * ps : buy) : null; })(),
             }],
           });
+        },
+      },
+    ],
+  });
+}
+
+// Renglones para capturar el precio de cada artículo.
+function priceInputs(items, map, currency) {
+  return h('ul', { class: 'price-inputs' }, items.map(it => {
+    const q = it.packs ? `${it.packs} × ${it.packName}` : fmtIn(boughtQty(it), it.unit, { ceil: true });
+    return h('li', null,
+      h('div', { class: 'row-main' }, h('div', { class: 'row-title' }, it.name), h('div', { class: 'row-sub' }, q, it.est != null ? ` · estimado ${fmtMoney(it.est, currency)}` : '')),
+      numInput(map[it.id], v => { map[it.id] = v; }, { placeholder: '$', label: `Precio de ${it.name}` }));
+  }));
+}
+
+function applyPrices(list, map) {
+  return list.items.map(it => (Object.prototype.hasOwnProperty.call(map, it.id) ? { ...it, price: map[it.id] > 0 ? map[it.id] : null } : it));
+}
+
+function capturePrices(l) {
+  const map = {};
+  l.items.forEach(it => { map[it.id] = it.price ?? null; });
+  modal({
+    title: 'Precios por artículo',
+    body: h('div', { class: 'stack' },
+      h('p', { class: 'muted small' }, `Lo que pagaste por cada artículo (${l.currency || 'MXN'}). Deja vacío lo que no sepas. Con esto se calcula el promedio de cada ingrediente.`),
+      priceInputs(l.items, map, l.currency || 'MXN')),
+    actions: [
+      { label: 'Cancelar', kind: 'ghost' },
+      {
+        label: 'Guardar precios', kind: 'primary', onClick: () => {
+          const fresh = S.get('lists', l.id) || l;
+          updateList(fresh, { items: applyPrices(fresh, map) });
+          toast('Precios guardados', 'ok');
         },
       },
     ],
@@ -313,13 +371,19 @@ function closePurchase(l) {
   let currency = l.currency || 'MXN';
   const unchecked = l.items.filter(it => !it.checked).length + (l.extras || []).filter(x => !x.checked).length;
   let markAll = true;
+  const prices = {};
+  l.items.forEach(it => { prices[it.id] = it.price ?? null; });
   modal({
     title: 'Cerrar compra',
     body: h('div', { class: 'stack' },
       h('div', { class: 'row-2' },
         field('Total del ticket', numInput(total, v => { total = v; }, { placeholder: '0.00' })),
         field('Moneda', select(CURRENCIES, currency, v => { currency = v; }))),
-      unchecked ? toggle(markAll, v => { markAll = v; }, `Compré todo (${unchecked} sin marcar)`, 'Si lo apagas, lo no marcado queda como no comprado.') : null),
+      unchecked ? toggle(markAll, v => { markAll = v; }, `Compré todo (${unchecked} sin marcar)`, 'Si lo apagas, lo no marcado queda como no comprado.') : null,
+      h('details', { class: 'help' },
+        h('summary', null, 'Precios por artículo (opcional)'),
+        h('p', { class: 'muted small' }, 'Lo que pagaste por cada uno, en la moneda del ticket. Sirve para el promedio de precios y el costo estimado.'),
+        priceInputs(l.items, prices, currency))),
     actions: [
       { label: 'Cancelar', kind: 'ghost' },
       {
@@ -332,7 +396,7 @@ function closePurchase(l) {
               extras: (fresh.extras || []).map(x => ({ ...x, checked: true })),
             };
           }
-          updateList(fresh, { total, currency, status: 'closed', closedAt: Date.now() });
+          updateList(fresh, { items: applyPrices(fresh, prices), total, currency, status: 'closed', closedAt: Date.now() });
           toast('Compra cerrada', 'ok');
         },
       },
@@ -404,7 +468,9 @@ function detail(id) {
       h('div', { class: 'shop-qty', onclick: () => editItem(S.get('lists', l.id), it) },
         h('strong', null, q.main),
         q.sub ? h('span', { class: 'muted small' }, q.sub) : null,
-        it.extra ? h('span', { class: 'warn-text small' }, '+ ' + it.extra) : null),
+        it.extra ? h('span', { class: 'warn-text small' }, '+ ' + it.extra) : null,
+        it.price > 0 ? h('span', { class: 'small price-paid' }, fmtMoney(it.price, l.currency || 'MXN'))
+          : it.est != null ? h('span', { class: 'muted small' }, '≈ ' + fmtMoney(it.est, l.estCurrency || l.currency || 'MXN')) : null),
       iconBtn('edit', 'Editar', () => editItem(S.get('lists', l.id), it), { cls: 'no-print' }));
   };
 
@@ -466,6 +532,21 @@ function detail(id) {
         field('Total', numInput(l.total, v => updateList(S.get('lists', l.id), { total: v }), { k: 'l-total', placeholder: '0.00' })),
         field('Moneda', select(CURRENCIES, l.currency || 'MXN', v => updateList(S.get('lists', l.id), { currency: v }), { k: 'l-cur' }))),
       l.total ? h('p', { class: 'ticket-total' }, fmtMoney(l.total, l.currency || 'MXN')) : null,
+      ticketSummary(l),
+      h('div', { class: 'btn-row no-print' },
+        btn('Capturar precios', () => capturePrices(S.get('lists', l.id)), { small: true, kind: 'ghost', icon: 'money' }),
+        !closed ? btn('Actualizar estimado', () => {
+          const fresh = S.get('lists', l.id);
+          const cur = S.settings().currency || 'MXN';
+          updateList(fresh, {
+            estCurrency: cur,
+            items: fresh.items.map(it => {
+              const pi = it.ingId ? priceInfo(S.get('ingredients', it.ingId), cur) : null;
+              return { ...it, est: pi ? pi.per * boughtQty(it) : null };
+            }),
+          });
+          toast('Estimado actualizado con tus últimos precios', 'ok');
+        }, { small: true, kind: 'ghost', icon: 'sync' }) : null),
       closed ? h('p', { class: 'muted small' }, `Cerrada el ${fmtDate(l.closedAt)}`) : null),
     h('div', { class: 'btn-row end no-print' },
       closed
@@ -478,6 +559,22 @@ function detail(id) {
       }, { kind: 'danger', icon: 'trash' })),
   );
   return { title: l.name, el };
+}
+
+function ticketSummary(l) {
+  const cur = l.currency || 'MXN';
+  const est = l.items.filter(it => it.est != null);
+  const paid = l.items.filter(it => it.price > 0);
+  const parts = [];
+  if (est.length) parts.push(h('div', null, h('span', { class: 'muted small' }, 'Estimado'), h('strong', null, fmtMoney(est.reduce((s, it) => s + it.est, 0), l.estCurrency || cur)),
+    est.length < l.items.length ? h('span', { class: 'muted small' }, `${l.items.length - est.length} sin precio`) : null));
+  if (paid.length) parts.push(h('div', null, h('span', { class: 'muted small' }, 'Precios capturados'), h('strong', null, fmtMoney(paid.reduce((s, it) => s + it.price, 0), cur)),
+    h('span', { class: 'muted small' }, `${paid.length} de ${l.items.length} artículos`)));
+  if (est.length && l.total > 0 && (l.estCurrency || cur) === cur) {
+    const diff = l.total - est.reduce((s, it) => s + it.est, 0);
+    parts.push(h('div', null, h('span', { class: 'muted small' }, 'Ticket vs. estimado'), h('strong', null, (diff >= 0 ? '+' : '−') + fmtMoney(Math.abs(diff), cur))));
+  }
+  return parts.length ? h('div', { class: 'ticket-summary' }, parts) : null;
 }
 
 // Lo que tenías al generar la lista. Las listas viejas solo guardaban lo de los artículos.

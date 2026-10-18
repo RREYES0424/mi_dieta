@@ -3,6 +3,7 @@ import * as S from '../store.js';
 import { h, btn, iconBtn, field, numInput, textInput, select, modal, confirmDialog, promptDialog, toast, empty, icon } from '../ui.js';
 import { UNITS, BUY_UNITS, RECIPE_UNITS, trimZeros } from '../units.js';
 import { refresh } from '../nav.js';
+import { priceInfo, fmtUnitPrice, avgN } from '../prices.js';
 
 let search = '';
 let aisleFilter = '';
@@ -36,7 +37,30 @@ function summary(ing) {
   if (Number(ing.margen) > 0) bits.push(`+${pctLabel(ing.margen)} extra`);
   if (ing.pack && Number(ing.pack.size) > 0) bits.push(`${ing.pack.name || 'paquete'} de ${trimZeros(String(ing.pack.size))} ${UNITS[ing.pack.unit || 'g'].label}`);
   if (Number(ing.gPorPieza) > 0) bits.push(`1 pz = ${trimZeros(String(ing.gPorPieza))} g`);
+  const pi = priceInfo(ing);
+  if (pi) bits.push(`${pi.source === 'historial' ? '' : 'ref. '}${fmtUnitPrice(pi.per, ing.buyUnit, pi.currency)}`);
   return bits.join(' · ');
+}
+
+// Resumen e historial de precios de un ingrediente.
+function priceHistory(ing) {
+  if (!ing) return h('p', { class: 'muted small' }, 'Cuando captures precios en tus listas verás aquí el promedio.');
+  const cur = S.settings().currency || 'MXN';
+  const pi = priceInfo(ing, cur);
+  if (!pi || pi.source !== 'historial') return h('p', { class: 'muted small' }, 'Aún no capturas precios de este ingrediente en tus listas. Hazlo al cerrar una compra o desde "Capturar precios".');
+  const pct = pi.prev ? (pi.last - pi.prev) / pi.prev : null;
+  return h('div', { class: 'price-box' },
+    h('div', { class: 'price-stats' },
+      h('div', null, h('span', { class: 'muted small' }, `Promedio (últimas ${pi.n})`), h('strong', null, fmtUnitPrice(pi.per, ing.buyUnit, cur))),
+      h('div', null, h('span', { class: 'muted small' }, 'Última compra'), h('strong', null, fmtUnitPrice(pi.last, ing.buyUnit, cur)),
+        pct != null && Math.abs(pct) >= 0.005 ? h('span', { class: 'small ' + (pct > 0 ? 'warn-text' : 'ok-text') }, `${pct > 0 ? '▲' : '▼'} ${Math.abs(Math.round(pct * 100))}% vs. antes`) : null),
+      h('div', null, h('span', { class: 'muted small' }, 'Mínimo – máximo'), h('strong', null, `${fmtUnitPrice(pi.min, ing.buyUnit, cur)} – ${fmtUnitPrice(pi.max, ing.buyUnit, cur)}`))),
+    h('details', { class: 'help' },
+      h('summary', null, `Ver ${pi.total} compra${pi.total === 1 ? '' : 's'}`),
+      h('ul', { class: 'dish-items' }, pi.entries.slice(0, 20).map(e => h('li', null,
+        h('span', null, new Date(e.date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }), h('span', { class: 'muted' }, ' · ' + e.listName)),
+        h('span', { class: 'qty' }, fmtUnitPrice(e.perTarget, ing.buyUnit, cur)))))),
+    h('p', { class: 'muted small' }, `El promedio usa tus últimas ${avgN()} compras (lo cambias en Ajustes).`));
 }
 
 // Editor de ingrediente en una ventana. `prefill` permite precargar el nombre.
@@ -72,6 +96,11 @@ export function openIngredientEditor(ing, onSaved, prefill = {}) {
     h('div', { class: 'row-2' },
       field('Contenido', numInput(d.pack.size, v => { d.pack.size = v; })),
       field('Unidad', select(unitOptions(RECIPE_UNITS.concat(['floz', 'gal']).filter((u, i, a) => a.indexOf(u) === i)), d.pack.unit, v => { d.pack.unit = v; }))),
+
+    h('h3', { class: 'span-2 form-section' }, 'Precio'),
+    h('div', { class: 'span-2' }, priceHistory(ing)),
+    field('Precio de referencia (opcional)', numInput(d.refPrice, v => set('refPrice', v)), 'Por unidad de compra. Se usa mientras no tengas compras con precio.'),
+    field('Moneda', select([{ value: 'MXN', label: 'MXN' }, { value: 'USD', label: 'USD' }], d.refCurrency || S.settings().currency || 'MXN', v => set('refCurrency', v))),
 
     h('h3', { class: 'span-2 form-section' }, 'Macros por 100 g (opcional)'),
     h('div', { class: 'span-2 row-4' },

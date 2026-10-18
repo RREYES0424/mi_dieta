@@ -210,6 +210,7 @@ export function modal({ title, body, actions = [], wide = false, onClose }) {
   dlg.showModal();
   const first = dlg.querySelector('.modal-body input, .modal-body select, .modal-body textarea');
   if (first && !window.matchMedia('(pointer: coarse)').matches) first.focus();
+  else { form.setAttribute('tabindex', '-1'); form.focus({ preventScroll: true }); }
   return { close, el: dlg };
 }
 
