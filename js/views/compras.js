@@ -1,6 +1,6 @@
 // Listas de compras: generar a partir de la dieta, historial con casillas, total del ticket.
 import * as S from '../store.js';
-import { h, btn, iconBtn, field, numInput, textInput, select, checkbox, toggle, modal, confirmDialog, toast, empty, icon, fmtDate } from '../ui.js';
+import { h, btn, iconBtn, field, numInput, textInput, select, checkbox, toggle, modal, confirmDialog, toast, empty, icon, fmtDate, dateInput } from '../ui.js';
 import { unitOf, collapse, fmtIn, isZeroVec, displayUnit, trimZeros } from '../units.js';
 import {
   activePlan, rangeNeeds, purchaseVec, buyDim, packSize,
@@ -215,7 +215,7 @@ function generator() {
     h('div', { class: 'page-head' }, iconBtn('back', 'Volver', () => go('compras')), h('h2', { class: 'grow' }, 'Nueva lista de compras')),
     h('section', { class: 'card form-grid' },
       field('Dieta', select(plans.map(p => ({ value: p.id, label: p.name })), gen.planId, v => { gen.planId = v; refresh(); })),
-      field('Primer día', h('input', { class: 'input', type: 'date', value: gen.start, 'data-k': 'g-start', onchange: e => { if (e.target.value) { gen.start = e.target.value; refresh(); } } })),
+      field('Primer día', dateInput(gen.start, v => { if (v) { gen.start = v; refresh(); } }, { k: 'g-start', label: 'Primer día' })),
       field('Días', numInput(gen.days, v => { gen.days = Math.min(Math.max(Math.round(v || 7), 1), 90); refresh(); }, { k: 'g-days' }), `Del ${fmtDate(start, { day: 'numeric', month: 'short' })} al ${fmtDate(end, { day: 'numeric', month: 'short' })}`),
       h('p', { class: 'muted small span-2' }, 'Escribe cuánto tienes de cada ingrediente (o toca "Lo tengo") y la lista solo pedirá lo que falta. Desmarca lo que no quieras comprar.')),
     !rows.length

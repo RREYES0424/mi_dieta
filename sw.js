@@ -1,6 +1,6 @@
 // Modo sin conexión: guarda los archivos de la app y los sirve si no hay internet.
 // Primero intenta la red (para recibir actualizaciones) y si falla usa la copia guardada.
-const CACHE = 'mi-dieta-v4';
+const CACHE = 'mi-dieta-v5';
 const FILES = [
   './',
   './index.html',

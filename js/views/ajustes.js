@@ -1,7 +1,7 @@
 // Ajustes: sincronización con gist, apariencia, moneda, respaldo e instalación.
 import * as S from '../store.js';
 import * as Sync from '../sync.js';
-import { h, btn, field, select, segmented, numInput, confirmDialog, toast, icon, fmtDateTime, modal, toggle } from '../ui.js';
+import { h, btn, field, select, segmented, numInput, confirmDialog, toast, icon, fmtDateTime, modal, toggle, dateInput } from '../ui.js';
 import { reset as resetVersions } from './versiones.js';
 import * as Rem from '../reminders.js';
 import { AVG_OPTIONS, avgN } from '../prices.js';
@@ -76,10 +76,8 @@ function syncCard() {
       h('dt', null, 'Estado'), h('dd', { class: st.status === 'error' ? 'err-text' : '' }, labels[st.status] || st.status, st.message && st.status === 'error' ? ` — ${st.message}` : ''),
       h('dt', null, 'Última vez'), h('dd', null, cfg.lastSync ? fmtDateTime(cfg.lastSync) : '—'),
       h('dt', null, 'Token vence'), h('dd', null, expiryText())),
-    cfg.tokenExpires ? null : field('¿Cuándo vence tu token? (opcional)', h('input', {
-      class: 'input', type: 'date', value: cfg.manualExpires || '', 'data-k': 'tok-exp',
-      onchange: e => { Sync.setManualExpiry(e.target.value); refresh(); },
-    }), 'Es la fecha que elegiste en "Expiration" al crearlo. Te avisaremos una semana antes.'),
+    cfg.tokenExpires ? null : field('¿Cuándo vence tu token? (opcional)', dateInput(cfg.manualExpires || '', v => { Sync.setManualExpiry(v); refresh(); },
+      { k: 'tok-exp', label: 'Vencimiento del token', clearable: true, placeholder: 'Sin fecha' }), 'Es la fecha que elegiste en "Expiration" al crearlo. Te avisaremos una semana antes.'),
     h('p', { class: 'muted small' }, 'Los cambios se suben solos unos segundos después de hacerlos y se descargan al abrir la app. Si editas en dos dispositivos, se combinan registro por registro (gana el cambio más reciente).'),
     h('div', { class: 'btn-row' },
       btn('Sincronizar ahora', () => Sync.syncNow(), { kind: 'primary', icon: 'sync' }),

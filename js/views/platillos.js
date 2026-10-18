@@ -1,6 +1,6 @@
 // Platillos (recetas): ingredientes con cantidades, reutilizables en cualquier tiempo de comida.
 import * as S from '../store.js';
-import { h, btn, iconBtn, field, numInput, textInput, select, checkbox, modal, confirmDialog, promptDialog, toast, empty, icon, segmented } from '../ui.js';
+import { h, btn, iconBtn, field, numInput, textInput, select, checkbox, modal, confirmDialog, promptDialog, toast, empty, icon, segmented, combo } from '../ui.js';
 import { UNITS, RECIPE_UNITS } from '../units.js';
 import { recipeMacros, anyMacros, hasOwnMacros } from '../calc.js';
 import { openIngredientEditor, findIngredientByName, unitOptions } from './ingredientes.js';
@@ -76,8 +76,8 @@ export async function deleteRecipe(r) {
   return true;
 }
 
-function ingredientDatalist(id) {
-  return h('datalist', { id }, S.all('ingredients').sort(S.byName).map(i => h('option', { value: i.name })));
+function ingredientNames() {
+  return S.all('ingredients').sort(S.byName).map(i => i.name);
 }
 
 // Resuelve un nombre a ingrediente; si no existe ofrece crearlo.
@@ -98,9 +98,11 @@ function lineRow(r, it, idx) {
   };
   return h('li', { class: 'line' },
     h('div', { class: 'line-name' },
-      textInput(ing ? ing.name : '(ingrediente eliminado)', v => {
-        resolveIngredient(v, found => update({ ingId: found.id }));
-      }, { list: 'dl-ings', k: `rl-name-${idx}`, label: 'Ingrediente' })),
+      combo({
+        value: ing ? ing.name : '(ingrediente eliminado)', options: ingredientNames(),
+        onCommit: v => resolveIngredient(v, found => update({ ingId: found.id })),
+        k: `rl-name-${idx}`, label: 'Ingrediente',
+      })),
     h('div', { class: 'line-qty' },
       numInput(it.qty, v => update({ qty: v || 0 }), { k: `rl-qty-${idx}`, label: 'Cantidad' }),
       select(unitOptions(RECIPE_UNITS).map(o => ({ ...o, label: UNITS[o.value].label })), it.unit, v => update({ unit: v }), { k: `rl-unit-${idx}`, label: 'Unidad', cls: 'unit-select' })),
@@ -118,8 +120,14 @@ function lineRow(r, it, idx) {
 }
 
 function addLine(r) {
-  const nameInp = textInput(draftLine.name, v => { draftLine.name = v; }, { list: 'dl-ings', k: 'nl-name', placeholder: 'Ingrediente…', label: 'Nuevo ingrediente' });
-  nameInp.addEventListener('input', e => { draftLine.name = e.target.value; });
+  const nameInp = combo({
+    value: draftLine.name, options: ingredientNames(), placeholder: 'Ingrediente…', k: 'nl-name', label: 'Ingrediente',
+    onInput: v => { draftLine.name = v; },
+    onCommit: (v, picked) => {
+      draftLine.name = v;
+      if (picked) setTimeout(() => qtyInp.focus(), 0);
+    },
+  });
   const qtyInp = numInput(draftLine.qty, v => { draftLine.qty = v; }, { k: 'nl-qty', placeholder: 'Cant.', label: 'Cantidad' });
   qtyInp.addEventListener('input', e => { draftLine.qty = e.target.value; });
   const commit = () => {
@@ -235,7 +243,6 @@ function editor(id) {
       h('div', { class: 'card-head' }, h('h2', null, 'Ingredientes'), macrosLine(macros)),
       anyPrices() && costText(recipeCost(r), S.settings().currency || 'MXN') ? h('p', { class: 'cost-line' }, 'Costo por porción ', costText(recipeCost(r), S.settings().currency || 'MXN')) : null,
       h('p', { class: 'muted small' }, 'Marca "Cocido" cuando la cantidad sea en peso cocido; la lista lo convertirá a crudo con la merma de cocción del ingrediente.'),
-      ingredientDatalist('dl-ings'),
       h('ul', { class: 'lines' }, r.items.map((it, i) => lineRow(r, it, i)), addLine(r))),
     ownMacrosCard(r),
     h('section', { class: 'card' },

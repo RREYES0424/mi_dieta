@@ -715,3 +715,104 @@ button { font: inherit; color: inherit; }
 .swap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .swap-text { font-weight: 600; }
 .modal-card:focus { outline: none; }
+
+/* ===================== Controles propios ===================== */
+.dd {
+  display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer;
+  font-weight: 500; color: var(--text); user-select: none;
+}
+.dd:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.dd[aria-expanded="true"] { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent); }
+.dd-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-empty .dd-label { color: color-mix(in srgb, var(--muted) 85%, transparent); font-weight: 400; }
+.dd-chev { width: 18px; height: 18px; color: var(--muted); transition: transform .15s; }
+.dd[aria-expanded="true"] .dd-chev { transform: rotate(180deg); }
+.dd-lead { width: 18px; height: 18px; color: var(--accent); }
+.grow-0.dd, .toolbar > .dd.grow-0 { flex: 0 1 auto; max-width: 100%; }
+.unit-select { min-width: 0; }
+
+.pop {
+  position: fixed; z-index: 200;
+  display: flex; flex-direction: column;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(10, 20, 14, .18), 0 2px 6px rgba(10, 20, 14, .08);
+  overflow: auto; overscroll-behavior: contain; animation: pop-in .12s ease-out;
+}
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.pop-inner { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.pop-search { margin: 8px; width: auto; min-height: 38px; }
+.pop-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; outline: none; flex: 1 1 auto; overscroll-behavior: contain; }
+.pop-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-radius: 9px; cursor: pointer; font-size: .95rem;
+}
+.pop-opt.active { background: var(--surface-2); }
+.pop-opt.selected { color: var(--accent); font-weight: 700; }
+.pop-opt.disabled { opacity: .45; cursor: default; }
+.pop-opt .ico { width: 16px; height: 16px; flex: 0 0 auto; }
+.pop-create { color: var(--accent); font-weight: 600; justify-content: flex-start; }
+.pop-group { padding: 10px 12px 4px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.pop-empty { padding: 12px; color: var(--muted); font-size: .9rem; }
+.pop-title { padding: 14px 18px 4px; font-weight: 700; font-size: 1rem; }
+.pop-backdrop { position: fixed; inset: 0; z-index: 199; background: rgba(8, 14, 10, .45); animation: fade-in .15s; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.pop-sheet {
+  left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100% !important;
+  max-height: 72dvh !important; border-radius: 18px 18px 0 0; border-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom); animation: sheet-in .18s ease-out;
+}
+.pop-sheet .pop-opt { padding: 13px 14px; font-size: 1rem; }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+
+/* Calendario */
+.cal { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cal-head strong { font-size: .98rem; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-week span { text-align: center; font-size: .72rem; color: var(--muted); font-weight: 700; padding: 4px 0; }
+.cal-day {
+  height: 38px; border: 0; border-radius: 10px; background: transparent; cursor: pointer;
+  font: inherit; font-size: .92rem; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.cal-day:hover:not([disabled]) { background: var(--surface-2); }
+.cal-day.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal-day.selected { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.cal-day[disabled] { opacity: .3; cursor: default; }
+.cal-day:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.cal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 4px; }
+
+/* Selector de hora */
+.tp { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.tp-cols { display: grid; grid-template-columns: 1fr 1fr 1.1fr; gap: 6px; }
+.tp-col { list-style: none; margin: 0; padding: 4px; max-height: 210px; overflow-y: auto; border-radius: 10px; background: var(--surface-2); overscroll-behavior: contain; }
+.tp-opt { width: 100%; border: 0; background: transparent; border-radius: 8px; padding: 9px 6px; font: inherit; color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+.tp-opt:hover { background: var(--surface); }
+.tp-opt.selected { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+/* "Ver más" propio en lugar del triángulo del sistema */
+summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+summary::-webkit-details-marker { display: none; }
+summary::before {
+  content: ""; width: 7px; height: 7px; flex: 0 0 auto;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform .15s; margin-right: 2px;
+}
+details[open] > summary::before { transform: rotate(45deg); }
+
+/* Buscadores sin adornos del sistema */
+input[type="search"] { -webkit-appearance: none; appearance: none; }
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; display: none; }
+
+/* Barras de desplazamiento con el estilo de la app */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 40%, transparent); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--muted) 65%, transparent); }
+
+/* Texto seleccionado y cursor con los colores de la app */
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+input, textarea { caret-color: var(--accent); }

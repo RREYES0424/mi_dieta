@@ -1,6 +1,6 @@
 // Progreso: peso y medidas, cumplimiento de la dieta, promedios e historial.
 import * as S from '../store.js';
-import { h, btn, iconBtn, field, numInput, segmented, modal, confirmDialog, toast, fmtDate, chartWidth, niceStep, select } from '../ui.js';
+import { h, btn, iconBtn, field, numInput, segmented, modal, confirmDialog, toast, fmtDate, chartWidth, niceStep, select, dateInput } from '../ui.js';
 import { isoDate, parseIsoDate, addDays, startOfDay, dayMacros, activePlan, anyMacros, fmtMoney, WEEK_ORDER, DAY_SHORT } from '../calc.js';
 import { trimZeros } from '../units.js';
 import { bodyEntries, weightIn, weightToKg, lengthIn, lengthToCm, dayStats, recentLogs, streak, getLog, periods, periodStats, addHistoryEntry, moveHistoryEntry } from '../tracking.js';
@@ -36,7 +36,7 @@ function openBodyEditor(entry) {
     fat: entry ? entry.fat : null,
     note: entry ? entry.note || '' : '',
   };
-  const dateInp = h('input', { class: 'input', type: 'date', value: d.date });
+  const dateInp = dateInput(d.date, () => {}, { label: 'Fecha', max: isoDate(new Date()) });
   const noteInp = h('input', { class: 'input', value: d.note, placeholder: 'Opcional' });
   modal({
     title: entry ? 'Editar registro' : 'Registrar peso y medidas',
@@ -173,7 +173,7 @@ function openHistoryEditor(period) {
   if (!plans.length) { toast('Primero crea una dieta', 'warn'); return; }
   const today = isoDate(new Date());
   let planId = period ? period.planId : plans[0].id;
-  const dateInp = h('input', { class: 'input', type: 'date', max: today, value: period ? period.start : today });
+  const dateInp = dateInput(period ? period.start : today, () => {}, { label: 'Empezó el', max: today });
   modal({
     title: period ? 'Cambiar inicio de la dieta' : 'Agregar una dieta anterior',
     body: h('div', { class: 'stack' },

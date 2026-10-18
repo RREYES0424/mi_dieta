@@ -1,6 +1,6 @@
 // Dietas (planes): tiempos de comida con horario y platillos; personalizables por día.
 import * as S from '../store.js';
-import { h, btn, iconBtn, field, numInput, textInput, select, modal, confirmDialog, promptDialog, toast, empty, icon, segmented, fmtTime, fmtDate } from '../ui.js';
+import { h, btn, iconBtn, field, numInput, textInput, select, modal, confirmDialog, promptDialog, toast, empty, icon, segmented, fmtTime, fmtDate, combo, timeInput } from '../ui.js';
 import { mealsFor, entriesMacros, dayMacros, anyMacros, DAY_SHORT, DAY_NAMES, WEEK_ORDER, parseIsoDate, fmtMoney } from '../calc.js';
 import { macrosLine } from './platillos.js';
 import { refresh, go } from '../nav.js';
@@ -55,15 +55,14 @@ function recipeOptions() {
 async function addMeal(p) {
   let name = '';
   let time = '';
-  const nameInp = h('input', { class: 'input', placeholder: 'Ej. Desayuno, Snack, Pre entreno', list: 'dl-meal-names' });
-  const timeInp = h('input', { class: 'input', type: 'time' });
   const used = new Set((p.meals || []).map(m => m.name));
   const suggestions = ['Desayuno', 'Colación', 'Snack', 'Comida', 'Pre entreno', 'Post entreno', 'Cena'].filter(s => !used.has(s));
+  const nameInp = combo({ options: suggestions, placeholder: 'Ej. Desayuno, Snack, Pre entreno', label: 'Nombre', createLabel: null });
+  const timeInp = timeInput('', () => {}, { label: 'Hora' });
   modal({
     title: 'Nuevo tiempo de comida',
     body: h('div', { class: 'stack' },
       field('Nombre', nameInp),
-      h('datalist', { id: 'dl-meal-names' }, suggestions.map(s => h('option', { value: s }))),
       field('Hora', timeInp)),
     actions: [
       { label: 'Cancelar', kind: 'ghost' },
@@ -154,10 +153,10 @@ function mealCard(p, meal) {
     h('div', { class: 'meal-head' },
       general
         ? h('div', { class: 'meal-fields' },
-          h('input', {
-            class: 'input time-input', type: 'time', value: meal.time || '', 'data-k': `t-${meal.id}`, 'aria-label': 'Hora',
-            onchange: e => S.put('plans', { ...p, meals: p.meals.map(m => m.id === meal.id ? { ...m, time: e.target.value } : m) }),
-          }),
+          timeInput(meal.time || '', v => {
+            const fresh = S.get('plans', p.id) || p;
+            S.put('plans', { ...fresh, meals: fresh.meals.map(m => m.id === meal.id ? { ...m, time: v } : m) });
+          }, { k: `t-${meal.id}`, label: 'Hora', cls: 'time-input' }),
           textInput(meal.name, v => {
             if (v.trim()) S.put('plans', { ...p, meals: p.meals.map(m => m.id === meal.id ? { ...m, name: v.trim() } : m) });
           }, { k: `n-${meal.id}`, cls: 'meal-name-input', label: 'Nombre del tiempo de comida' }))

@@ -1,7 +1,7 @@
 // Arranque de la app: navegación, render y estado de sincronización.
 import * as S from './store.js';
 import * as Sync from './sync.js';
-import { h, icon } from './ui.js';
+import { h, icon, closePopover } from './ui.js';
 import { setRenderer } from './nav.js';
 import * as Hoy from './views/hoy.js';
 import * as Dieta from './views/dieta.js';
@@ -79,6 +79,8 @@ export function render() {
   try { sel = focusKey ? [active.selectionStart, active.selectionEnd] : null; } catch (e) { sel = null; }
   const scroll = window.scrollY;
 
+  // Una lista o calendario abierto se cierra al volver a pintar (su botón se reemplaza).
+  closePopover();
   let out;
   try {
     out = ROUTES[path].render(params);
